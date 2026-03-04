@@ -6,6 +6,7 @@ import android.os.Bundle
 import android.os.ParcelFileDescriptor
 import android.widget.Toast
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -69,7 +70,7 @@ class MainActivity : ComponentActivity() {
 @Composable
 private fun RapiDocApp() {
     val context = LocalContext.current
-    var reportInput by remember { mutableStateOf(SampleCases.normal()) }
+    var reportInput by remember { mutableStateOf(ReportInput(patient = PatientInfo(), findings = FindingsInput())) }
     var forceNormal by remember { mutableStateOf(false) }
     var currentPdfFile by remember { mutableStateOf<File?>(null) }
     var showPreview by remember { mutableStateOf(false) }
@@ -77,6 +78,13 @@ private fun RapiDocApp() {
     val reportBody = remember(reportInput) { RulesEngine.buildReport(reportInput) }
 
     Scaffold { padding ->
+        BackHandler(enabled = true) {
+            if (showPreview) {
+                showPreview = false
+            } else {
+                (context as? android.app.Activity)?.finish()
+            }
+        }
         if (!showPreview) {
             QuickEntryScreen(
                 modifier = Modifier
@@ -99,16 +107,7 @@ private fun RapiDocApp() {
                     forceNormal = true
                     currentPdfFile = null
                 },
-                onLoadSurayya = {
-                    reportInput = SampleCases.surayya()
-                    forceNormal = false
-                    currentPdfFile = null
-                },
-                onLoadFayyaz = {
-                    reportInput = SampleCases.fayyaz()
-                    forceNormal = false
-                    currentPdfFile = null
-                },
+
                 onGoPreview = {
                     if (reportInput.patient.name.isBlank() || reportInput.patient.ageYears.isBlank()) {
                         Toast.makeText(context, "Patient name and age are required.", Toast.LENGTH_SHORT).show()
@@ -167,8 +166,7 @@ private fun QuickEntryScreen(
     onInputChange: (ReportInput) -> Unit,
     onForceNormal: (Boolean) -> Unit,
     onLoadNormal: () -> Unit,
-    onLoadSurayya: () -> Unit,
-    onLoadFayyaz: () -> Unit,
+
     onGoPreview: () -> Unit
 ) {
     val findings = reportInput.findings
@@ -182,7 +180,7 @@ private fun QuickEntryScreen(
         Text("Quick Entry", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
 
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text("Normal Toggle")
+            Text("Normal Toggle (resets input)")
             Spacer(Modifier.width(8.dp))
             Switch(checked = forceNormal, onCheckedChange = onForceNormal)
         }
@@ -194,6 +192,15 @@ private fun QuickEntryScreen(
             },
             modifier = Modifier.fillMaxWidth(),
             label = { Text("Patient Name*") }
+        )
+
+        OutlinedTextField(
+            value = reportInput.patient.patientId,
+            onValueChange = {
+                onInputChange(reportInput.copy(patient = reportInput.patient.copy(patientId = it)))
+            },
+            modifier = Modifier.fillMaxWidth(),
+            label = { Text("Patient ID (optional)") }
         )
 
         OutlinedTextField(
@@ -214,61 +221,102 @@ private fun QuickEntryScreen(
             onSelect = { onInputChange(reportInput.copy(patient = reportInput.patient.copy(sex = it))) }
         )
 
-        EnumSelector(
-            label = "Fatty Liver Grade",
-            options = listOf(0, 1, 2, 3),
-            selected = findings.fattyGrade,
-            enabled = !forceNormal,
-            itemLabel = { if (it == 0) "None" else "Grade $it" },
-            onSelect = { onInputChange(reportInput.copy(findings = findings.copy(fattyGrade = it))) }
-        )
-
-        EnumSelector(
-            label = "Hepatomegaly",
-            options = Hepatomegaly.entries,
-            selected = findings.hepatomegaly,
-            enabled = !forceNormal,
-            itemLabel = { it.name.replace("_", " ") },
-            onSelect = { onInputChange(reportInput.copy(findings = findings.copy(hepatomegaly = it))) }
-        )
-
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text("CLD")
-            Spacer(Modifier.width(8.dp))
-            Switch(
-                checked = findings.cld,
-                enabled = !forceNormal,
-                onCheckedChange = { onInputChange(reportInput.copy(findings = findings.copy(cld = it))) }
-            )
+        // Liver
+        OrganSection("Liver", findings.liverPrintMode, forceNormal,
+            onModeChange = { onInputChange(reportInput.copy(findings = findings.copy(liverPrintMode = it))) }) {
+            EnumSelector(label = "Fatty Liver Grade", options = listOf(0, 1, 2, 3), selected = findings.fattyGrade, enabled = true,
+                itemLabel = { if (it == 0) "None" else "Grade $it" },
+                onSelect = { onInputChange(reportInput.copy(findings = findings.copy(fattyGrade = it))) })
+            EnumSelector(label = "Hepatomegaly", options = Hepatomegaly.entries, selected = findings.hepatomegaly, enabled = true,
+                itemLabel = { it.name.replace("_", " ") },
+                onSelect = { onInputChange(reportInput.copy(findings = findings.copy(hepatomegaly = it))) })
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("CLD")
+                Spacer(Modifier.width(8.dp))
+                Switch(checked = findings.cld, onCheckedChange = { onInputChange(reportInput.copy(findings = findings.copy(cld = it))) })
+            }
+            EnumSelector(label = "Ascites", options = Ascites.entries, selected = findings.ascites, enabled = true,
+                itemLabel = { it.name.replace("_", " ") },
+                onSelect = { onInputChange(reportInput.copy(findings = findings.copy(ascites = it))) })
         }
 
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text("Gallstones")
-            Spacer(Modifier.width(8.dp))
-            Switch(
-                checked = findings.gallstones,
-                enabled = !forceNormal,
-                onCheckedChange = { onInputChange(reportInput.copy(findings = findings.copy(gallstones = it))) }
-            )
+        // Gallbladder
+        OrganSection("Gallbladder", findings.gbPrintMode, forceNormal,
+            onModeChange = { onInputChange(reportInput.copy(findings = findings.copy(gbPrintMode = it))) }) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("Gallstones")
+                Spacer(Modifier.width(8.dp))
+                Switch(checked = findings.gallstones, onCheckedChange = { onInputChange(reportInput.copy(findings = findings.copy(gallstones = it))) })
+            }
+            if (findings.gallstones) {
+                OutlinedTextField(value = findings.gallstoneSizeMm, onValueChange = { onInputChange(reportInput.copy(findings = findings.copy(gallstoneSizeMm = it.filter(Char::isDigit)))) },
+                    modifier = Modifier.fillMaxWidth(), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), label = { Text("Stone size (mm)") })
+            }
         }
 
-        EnumSelector(
-            label = "Hydronephrosis Left",
-            options = Hydronephrosis.entries,
-            selected = findings.hydronephrosisLeft,
-            enabled = !forceNormal,
-            itemLabel = { it.name.replace("_", " ") },
-            onSelect = { onInputChange(reportInput.copy(findings = findings.copy(hydronephrosisLeft = it))) }
-        )
+        // CBD
+        OrganSection("CBD", findings.cbdPrintMode, forceNormal,
+            onModeChange = { onInputChange(reportInput.copy(findings = findings.copy(cbdPrintMode = it))) }) {
+        }
 
-        EnumSelector(
-            label = "Hydronephrosis Right",
-            options = Hydronephrosis.entries,
-            selected = findings.hydronephrosisRight,
-            enabled = !forceNormal,
-            itemLabel = { it.name.replace("_", " ") },
-            onSelect = { onInputChange(reportInput.copy(findings = findings.copy(hydronephrosisRight = it))) }
-        )
+        // Pancreas
+        OrganSection("Pancreas", findings.pancreasPrintMode, forceNormal,
+            onModeChange = { onInputChange(reportInput.copy(findings = findings.copy(pancreasPrintMode = it))) }) {
+        }
+
+        // Spleen
+        OrganSection("Spleen", findings.spleenPrintMode, forceNormal,
+            onModeChange = { onInputChange(reportInput.copy(findings = findings.copy(spleenPrintMode = it))) }) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("Splenomegaly")
+                Spacer(Modifier.width(8.dp))
+                Switch(checked = findings.splenomegaly, onCheckedChange = { onInputChange(reportInput.copy(findings = findings.copy(splenomegaly = it))) })
+            }
+            if (findings.splenomegaly) {
+                OutlinedTextField(value = findings.spleenSizeCm, onValueChange = { onInputChange(reportInput.copy(findings = findings.copy(spleenSizeCm = it))) },
+                    modifier = Modifier.fillMaxWidth(), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), label = { Text("Spleen size (cm)") })
+            }
+        }
+
+        // Right Kidney
+        OrganSection("Right Kidney", findings.rkPrintMode, forceNormal,
+            onModeChange = { onInputChange(reportInput.copy(findings = findings.copy(rkPrintMode = it))) }) {
+            EnumSelector(label = "Right CMD", options = CmdState.entries, selected = findings.rkCmd, enabled = true,
+                onSelect = { onInputChange(reportInput.copy(findings = findings.copy(rkCmd = it))) })
+            EnumSelector(label = "Hydronephrosis", options = Hydronephrosis.entries, selected = findings.hydronephrosisRight, enabled = true,
+                onSelect = { onInputChange(reportInput.copy(findings = findings.copy(hydronephrosisRight = it))) })
+            OutlinedTextField(value = findings.stoneRightMm, onValueChange = { onInputChange(reportInput.copy(findings = findings.copy(stoneRightMm = it.filter(Char::isDigit)))) },
+                modifier = Modifier.fillMaxWidth(), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), label = { Text("Right Renal Stone (mm)") })
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("Renal Cyst Right")
+                Spacer(Modifier.width(8.dp))
+                Switch(checked = findings.renalCystRight, onCheckedChange = { onInputChange(reportInput.copy(findings = findings.copy(renalCystRight = it))) })
+            }
+            if (findings.renalCystRight) {
+                OutlinedTextField(value = findings.renalCystRightSizeMm, onValueChange = { onInputChange(reportInput.copy(findings = findings.copy(renalCystRightSizeMm = it.filter(Char::isDigit)))) },
+                    modifier = Modifier.fillMaxWidth(), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), label = { Text("Cyst Size (mm)") })
+            }
+        }
+
+        // Left Kidney
+        OrganSection("Left Kidney", findings.lkPrintMode, forceNormal,
+            onModeChange = { onInputChange(reportInput.copy(findings = findings.copy(lkPrintMode = it))) }) {
+            EnumSelector(label = "Left CMD", options = CmdState.entries, selected = findings.lkCmd, enabled = true,
+                onSelect = { onInputChange(reportInput.copy(findings = findings.copy(lkCmd = it))) })
+            EnumSelector(label = "Hydronephrosis", options = Hydronephrosis.entries, selected = findings.hydronephrosisLeft, enabled = true,
+                onSelect = { onInputChange(reportInput.copy(findings = findings.copy(hydronephrosisLeft = it))) })
+            OutlinedTextField(value = findings.stoneLeftMm, onValueChange = { onInputChange(reportInput.copy(findings = findings.copy(stoneLeftMm = it.filter(Char::isDigit)))) },
+                modifier = Modifier.fillMaxWidth(), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), label = { Text("Left Renal Stone (mm)") })
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("Renal Cyst Left")
+                Spacer(Modifier.width(8.dp))
+                Switch(checked = findings.renalCystLeft, onCheckedChange = { onInputChange(reportInput.copy(findings = findings.copy(renalCystLeft = it))) })
+            }
+            if (findings.renalCystLeft) {
+                OutlinedTextField(value = findings.renalCystLeftSizeMm, onValueChange = { onInputChange(reportInput.copy(findings = findings.copy(renalCystLeftSizeMm = it.filter(Char::isDigit)))) },
+                    modifier = Modifier.fillMaxWidth(), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), label = { Text("Cyst Size (mm)") })
+            }
+        }
 
         EnumSelector(
             label = "Obstruction",
@@ -279,48 +327,45 @@ private fun QuickEntryScreen(
             onSelect = { onInputChange(reportInput.copy(findings = findings.copy(obstruction = it))) }
         )
 
-        OutlinedTextField(
-            value = findings.stoneLeftMm,
-            onValueChange = {
-                onInputChange(reportInput.copy(findings = findings.copy(stoneLeftMm = it.filter(Char::isDigit))))
-            },
-            modifier = Modifier.fillMaxWidth(),
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-            label = { Text("Left Renal Stone (mm)") },
-            enabled = !forceNormal
-        )
-
-        OutlinedTextField(
-            value = findings.stoneRightMm,
-            onValueChange = {
-                onInputChange(reportInput.copy(findings = findings.copy(stoneRightMm = it.filter(Char::isDigit))))
-            },
-            modifier = Modifier.fillMaxWidth(),
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-            label = { Text("Right Renal Stone (mm)") },
-            enabled = !forceNormal
-        )
-
-        EnumSelector(
-            label = "Ascites",
-            options = Ascites.entries,
-            selected = findings.ascites,
-            enabled = !forceNormal,
-            itemLabel = { it.name.replace("_", " ") },
-            onSelect = { onInputChange(reportInput.copy(findings = findings.copy(ascites = it))) }
-        )
+        // Urinary Bladder
+        OrganSection("Urinary Bladder", findings.bladderPrintMode, forceNormal,
+            onModeChange = { onInputChange(reportInput.copy(findings = findings.copy(bladderPrintMode = it))) }) {
+        }
 
         Spacer(Modifier.height(4.dp))
         Text("Load Sample Case", fontWeight = FontWeight.Bold)
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Button(onClick = onLoadNormal) { Text("Normal") }
-            Button(onClick = onLoadSurayya) { Text("Surayya 50F") }
-            Button(onClick = onLoadFayyaz) { Text("Fayyaz 32M") }
         }
 
         Spacer(Modifier.height(6.dp))
         Button(onClick = onGoPreview, modifier = Modifier.fillMaxWidth()) {
             Text("Go To Preview")
+        }
+    }
+}
+
+@Composable
+private fun OrganSection(
+    title: String,
+    mode: OrganPrintMode,
+    forceNormal: Boolean,
+    onModeChange: (OrganPrintMode) -> Unit,
+    content: @Composable () -> Unit
+) {
+    Column(modifier = Modifier.fillMaxWidth().background(Color(0xFFF9F9F9)).padding(8.dp)) {
+        Text(title, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
+        EnumSelector(
+            label = "Print Mode",
+            options = OrganPrintMode.entries,
+            selected = mode,
+            enabled = !forceNormal,
+            itemLabel = { it.name },
+            onSelect = onModeChange
+        )
+        if (mode == OrganPrintMode.ABNORMAL && !forceNormal) {
+            Spacer(Modifier.height(8.dp))
+            content()
         }
     }
 }
@@ -344,6 +389,9 @@ private fun PreviewScreen(
     ) {
         Text("Preview", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
         Text("Patient: ${reportInput.patient.name}")
+        if (reportInput.patient.patientId.trim().isNotEmpty()) {
+            Text("Patient ID: ${reportInput.patient.patientId}")
+        }
         Text("Age/Gender: ${reportInput.patient.ageYears} / ${reportInput.patient.sex.name}")
 
         Text("Impression", fontWeight = FontWeight.Bold)

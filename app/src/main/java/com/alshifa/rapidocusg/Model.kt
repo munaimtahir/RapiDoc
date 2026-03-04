@@ -4,6 +4,8 @@ import java.time.LocalDateTime
 
 enum class Sex { Male, Female }
 
+enum class OrganPrintMode { SKIP, NORMAL, ABNORMAL }
+
 enum class Hepatomegaly { NONE, MILD, MODERATE }
 
 enum class Hydronephrosis { NONE, MILD, MODERATE, SEVERE }
@@ -12,7 +14,11 @@ enum class Obstruction { UNSET, NOT_SEEN, SUSPECTED }
 
 enum class Ascites { NONE, MILD, MODERATE, GROSS }
 
+enum class CmdState { PRESERVED, REDUCED }
+
 data class PatientInfo(
+    /** Optional. If blank, it must not be printed on the report. */
+    val patientId: String = "",
     val name: String = "",
     val ageYears: String = "",
     val sex: Sex = Sex.Male,
@@ -21,16 +27,40 @@ data class PatientInfo(
 )
 
 data class FindingsInput(
+    val liverPrintMode: OrganPrintMode = OrganPrintMode.NORMAL,
     val fattyGrade: Int = 0,
     val hepatomegaly: Hepatomegaly = Hepatomegaly.NONE,
     val cld: Boolean = false,
+    val ascites: Ascites = Ascites.NONE,
+
+    val gbPrintMode: OrganPrintMode = OrganPrintMode.NORMAL,
     val gallstones: Boolean = false,
-    val hydronephrosisLeft: Hydronephrosis = Hydronephrosis.NONE,
+    val gallstoneSizeMm: String = "",
+
+    val cbdPrintMode: OrganPrintMode = OrganPrintMode.SKIP,
+
+    val pancreasPrintMode: OrganPrintMode = OrganPrintMode.SKIP,
+
+    val spleenPrintMode: OrganPrintMode = OrganPrintMode.NORMAL,
+    val splenomegaly: Boolean = false,
+    val spleenSizeCm: String = "",
+
+    val rkPrintMode: OrganPrintMode = OrganPrintMode.NORMAL,
+    val rkCmd: CmdState = CmdState.PRESERVED,
     val hydronephrosisRight: Hydronephrosis = Hydronephrosis.NONE,
-    val obstruction: Obstruction = Obstruction.UNSET,
-    val stoneLeftMm: String = "",
     val stoneRightMm: String = "",
-    val ascites: Ascites = Ascites.NONE
+    val renalCystRight: Boolean = false,
+    val renalCystRightSizeMm: String = "",
+
+    val lkPrintMode: OrganPrintMode = OrganPrintMode.NORMAL,
+    val lkCmd: CmdState = CmdState.PRESERVED,
+    val hydronephrosisLeft: Hydronephrosis = Hydronephrosis.NONE,
+    val stoneLeftMm: String = "",
+    val renalCystLeft: Boolean = false,
+    val renalCystLeftSizeMm: String = "",
+
+    val obstruction: Obstruction = Obstruction.UNSET,
+    val bladderPrintMode: OrganPrintMode = OrganPrintMode.NORMAL
 )
 
 data class ReportInput(

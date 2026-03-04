@@ -23,9 +23,13 @@ object SampleCases {
             bookingDateTime = now,
             reportingDateTime = now
         ),
+        // fatty liver grade 1 + bilateral mild hydronephrosis
         findings = FindingsInput(
+            liverPrintMode = OrganPrintMode.ABNORMAL,
             fattyGrade = 1,
+            lkPrintMode = OrganPrintMode.ABNORMAL,
             hydronephrosisLeft = Hydronephrosis.MILD,
+            rkPrintMode = OrganPrintMode.ABNORMAL,
             hydronephrosisRight = Hydronephrosis.MILD
         )
     )
@@ -38,8 +42,11 @@ object SampleCases {
             bookingDateTime = now,
             reportingDateTime = now
         ),
+        // fatty liver grade 1 + left moderate hydro + 6 mm left renal pelvis stone + obs not seen
         findings = FindingsInput(
+            liverPrintMode = OrganPrintMode.ABNORMAL,
             fattyGrade = 1,
+            lkPrintMode = OrganPrintMode.ABNORMAL,
             hydronephrosisLeft = Hydronephrosis.MODERATE,
             stoneLeftMm = "6",
             obstruction = Obstruction.NOT_SEEN

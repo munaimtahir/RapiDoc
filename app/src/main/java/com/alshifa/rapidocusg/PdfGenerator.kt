@@ -35,12 +35,14 @@ object PdfGenerator {
         drawHeader(context, canvas, bold)
         y = 90f
 
-        val demoRows = listOf(
-            "Patient Name" to input.patient.name,
-            "Age/Gender" to "${input.patient.ageYears} / ${input.patient.sex.name}",
-            "Booking Date/Time" to input.patient.bookingDateTime.format(displayDateTime),
-            "Reporting Date/Time" to input.patient.reportingDateTime.format(displayDateTime)
-        )
+        val demoRows = buildList {
+            add("Patient Name" to input.patient.name)
+            val pid = input.patient.patientId.trim()
+            if (pid.isNotEmpty()) add("Patient ID" to pid)
+            add("Age/Gender" to "${input.patient.ageYears} / ${input.patient.sex.name}")
+            add("Booking Date/Time" to input.patient.bookingDateTime.format(displayDateTime))
+            add("Reporting Date/Time" to input.patient.reportingDateTime.format(displayDateTime))
+        }
 
         y = drawDemographicsTable(canvas, y, demoRows, tableLabel, black, linePaint)
         y += 20f
