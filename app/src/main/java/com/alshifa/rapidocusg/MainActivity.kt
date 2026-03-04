@@ -148,8 +148,10 @@ private fun RapiDocApp() {
                     val now = LocalDateTime.now()
                     val inputForPdf = reportInput.copy(
                         patient = reportInput.patient.copy(
-                            bookingDateTime = reportInput.patient.bookingDateTime,
+```kotlin
+                            bookingDateTime = now.minusMinutes(20),
                             reportingDateTime = now
+```
                         )
                     )
                     val file = PdfGenerator.generatePdf(context, inputForPdf, RulesEngine.buildReport(inputForPdf))
