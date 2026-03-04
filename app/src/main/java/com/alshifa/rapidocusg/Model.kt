@@ -2,7 +2,7 @@ package com.alshifa.rapidocusg
 
 import java.time.LocalDateTime
 
-enum class Sex { Male, Female }
+enum class Sex { UNSET, Male, Female }
 
 enum class OrganPrintMode { SKIP, NORMAL, ABNORMAL }
 
@@ -21,7 +21,7 @@ data class PatientInfo(
     val patientId: String = "",
     val name: String = "",
     val ageYears: String = "",
-    val sex: Sex = Sex.Male,
+    val sex: Sex = Sex.UNSET,
     val bookingDateTime: LocalDateTime = LocalDateTime.now(),
     val reportingDateTime: LocalDateTime = LocalDateTime.now()
 )

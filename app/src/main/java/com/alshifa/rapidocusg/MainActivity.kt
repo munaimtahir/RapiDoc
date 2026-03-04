@@ -1,5 +1,6 @@
 package com.alshifa.rapidocusg
 
+import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.pdf.PdfRenderer
 import android.os.Bundle
@@ -25,6 +26,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.MaterialTheme
@@ -53,6 +55,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.time.LocalDateTime
+import com.google.gson.Gson
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -70,10 +73,30 @@ class MainActivity : ComponentActivity() {
 @Composable
 private fun RapiDocApp() {
     val context = LocalContext.current
-    var reportInput by remember { mutableStateOf(ReportInput(patient = PatientInfo(), findings = FindingsInput())) }
+    val prefs = remember { context.getSharedPreferences("RapiDocPrefs", Context.MODE_PRIVATE) }
+    val gson = remember { Gson() }
+
+    val initialFindings = remember {
+        val savedJson = prefs.getString("pref_findings", null)
+        if (savedJson != null) {
+            try {
+                gson.fromJson(savedJson, FindingsInput::class.java)
+            } catch (e: Exception) {
+                FindingsInput()
+            }
+        } else {
+            FindingsInput()
+        }
+    }
+
+    var reportInput by remember { mutableStateOf(ReportInput(patient = PatientInfo(), findings = initialFindings)) }
     var forceNormal by remember { mutableStateOf(false) }
     var currentPdfFile by remember { mutableStateOf<File?>(null) }
     var showPreview by remember { mutableStateOf(false) }
+
+    LaunchedEffect(reportInput.findings) {
+        prefs.edit().putString("pref_findings", gson.toJson(reportInput.findings)).apply()
+    }
 
     val reportBody = remember(reportInput) { RulesEngine.buildReport(reportInput) }
 
@@ -109,11 +132,7 @@ private fun RapiDocApp() {
                 },
 
                 onGoPreview = {
-                    if (reportInput.patient.name.isBlank() || reportInput.patient.ageYears.isBlank()) {
-                        Toast.makeText(context, "Patient name and age are required.", Toast.LENGTH_SHORT).show()
-                    } else {
-                        showPreview = true
-                    }
+                    showPreview = true
                 }
             )
         } else {
@@ -144,6 +163,12 @@ private fun RapiDocApp() {
                     } else {
                         PdfActions.print(context, file)
                     }
+                },
+                onNewReport = {
+                    reportInput = reportInput.copy(patient = PatientInfo())
+                    forceNormal = false
+                    currentPdfFile = null
+                    showPreview = false
                 },
                 onShare = {
                     val file = currentPdfFile
@@ -214,7 +239,7 @@ private fun QuickEntryScreen(
         )
 
         EnumSelector(
-            label = "Gender",
+            label = "Gender*",
             options = Sex.entries,
             selected = reportInput.patient.sex,
             enabled = true,
@@ -379,8 +404,11 @@ private fun PreviewScreen(
     onBack: () -> Unit,
     onGenerate: () -> Unit,
     onPrint: () -> Unit,
-    onShare: () -> Unit
+    onShare: () -> Unit,
+    onNewReport: () -> Unit
 ) {
+    var showError by remember { mutableStateOf(false) }
+    val isValid = reportInput.patient.name.isNotBlank() && reportInput.patient.ageYears.isNotBlank() && reportInput.patient.sex != Sex.UNSET
     Column(
         modifier = modifier
             .verticalScroll(rememberScrollState())
@@ -404,11 +432,37 @@ private fun PreviewScreen(
         PdfPreviewBox(file = currentPdfFile)
 
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Button(onClick = onGenerate) { Text("Generate PDF") }
+            Button(
+                onClick = {
+                    if (!isValid) {
+                        showError = true
+                    } else {
+                        showError = false
+                        onGenerate()
+                    }
+                },
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = if (isValid) MaterialTheme.colorScheme.primary else Color.Gray,
+                    contentColor = if (isValid) MaterialTheme.colorScheme.onPrimary else Color.LightGray
+                )
+            ) { Text("Generate PDF") }
             Button(onClick = onPrint) { Text("Print") }
             Button(onClick = onShare) { Text("Share") }
         }
-        TextButton(onClick = onBack) { Text("Back to Quick Entry") }
+
+        if (showError && !isValid) {
+            Text(
+                text = "Required fields (Name, Age, Gender) must be valid to generate.",
+                color = MaterialTheme.colorScheme.error,
+                style = MaterialTheme.typography.bodyMedium
+            )
+        }
+
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            TextButton(onClick = onBack) { Text("Back to Quick Entry") }
+            Spacer(Modifier.weight(1f))
+            Button(onClick = onNewReport) { Text("New Report") }
+        }
     }
 }
 
