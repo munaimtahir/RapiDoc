@@ -1,42 +1,23 @@
-RapiDocUSG Phase 0 build evidence
-Timestamp (UTC): 2026-03-05T03:00:16Z
-Working dir: /workspace/RapiDoc
+RapiDocUSG build evidence
+Timestamp (UTC): 2026-03-05T03:12:09Z
 
-Key file paths checked:
-- app/src/main/java/com/alshifa/rapidocusg/MainActivity.kt
-- app/src/main/java/com/alshifa/rapidocusg/Model.kt
-- app/src/main/java/com/alshifa/rapidocusg/RulesEngine.kt
-- app/src/main/java/com/alshifa/rapidocusg/SampleCases.kt
-- app/src/main/java/com/alshifa/rapidocusg/PdfGenerator.kt
-- app/src/main/java/com/alshifa/rapidocusg/PdfActions.kt
+Environment:
+- Gradle JDK pinned in `gradle.properties`: org.gradle.java.home=/root/.local/share/mise/installs/java/21.0.2
+- SDK path configured in local.properties: sdk.dir=/opt/android-sdk
 
-JDK checks:
-- default shell runtime: OpenJDK 25.0.1
-- Gradle pinned to JDK 21 via `org.gradle.java.home=/root/.local/share/mise/installs/java/21.0.2` in `gradle.properties`.
+Commands:
+1) ./gradlew clean --no-daemon --console=plain
+   Result: PASS
+2) ./gradlew assembleDebug --no-daemon --console=plain
+   Result: PASS
 
-Android SDK installation in sandbox:
-- Installed command-line tools under `/opt/android-sdk/cmdline-tools/latest`.
-- Accepted licenses with `sdkmanager --licenses`.
-- Installed packages:
-  - `platform-tools`
-  - `platforms;android-35`
-  - `build-tools;35.0.0`
-- AGP additionally installed `build-tools;34.0.0` during first build.
-- Repository `local.properties` configured with:
-  - `sdk.dir=/opt/android-sdk`
+Last lines of assembleDebug:
+> Task :app:processDebugJavaRes
+> Task :app:mergeProjectDexDebug
+> Task :app:mergeDebugJavaResource
+> Task :app:packageDebug
+> Task :app:createDebugApkListingFileRedirect
+> Task :app:assembleDebug
 
-Kotlin corruption check:
-- `rg -n '```' app/src/main/java/com/alshifa/rapidocusg/MainActivity.kt`
-- Result: no markdown fence tokens in current checkout.
-
-Gradle commands:
-1) `./gradlew clean --no-daemon --console=plain`
-   - Result: PASS
-2) `./gradlew assembleDebug --no-daemon --console=plain`
-   - Result: PASS
-   - Tail:
-     > Task :app:assembleDebug
-     BUILD SUCCESSFUL in 4m 27s
-
-Phase 0 status:
-- PASS: assembleDebug succeeds in this sandbox.
+BUILD SUCCESSFUL in 1m 13s
+37 actionable tasks: 36 executed, 1 up-to-date

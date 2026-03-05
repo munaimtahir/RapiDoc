@@ -1,16 +1,26 @@
 # Stage 2 Summary (Current Run)
 
-## Outcome
-Phase 0 build hygiene is now unblocked in this sandbox.
+## Completed
+- Replaced boolean screen toggle flow with route-based navigation using `NavHost`.
+  - Routes now include: `home`, `settings`, `upsell`, `doc/usg_abdomen/form`, `doc/usg_abdomen/preview`, and generic `doc/{docType}/form|preview`.
+- Added document engine foundation under `core/documentengine`:
+  - `DocumentType`, `DocumentPayload`, `BrandingConfig`, `TimeProvider`, `TimingConfig`, `DocumentRenderer`, `RenderedDocument`.
+  - `DocumentRegistry` with FREE/PRO allow-list rules.
+  - Renderer implementations for USG + 4 starter OPD docs (Medical Certificate, Prescription, Lab Request, Radiology Request).
+- Added settings persistence using DataStore preferences:
+  - `headerText`, `logoPath`, `planTier`, and per-document phone-row flags scaffold.
+- Added Settings screen:
+  - Header text update
+  - Logo upload (SAF picker -> internal file copy)
+  - FREE/PRO toggle (test scaffolding)
+  - Factory reset with confirmation
+- Added Home screen listing all docs with PRO lock labeling and upsell route.
+- Centralized USG generation time via `SystemTimeProvider` + `TimingConfig` (`booking = now - 20m`, `reporting = now`).
+- Removed sample-case load action from production USG entry flow.
 
-## Completed in this run
-- Installed Android SDK command-line tools and required platform/build-tools under `/opt/android-sdk`.
-- Set repository-local SDK path via `local.properties` (`sdk.dir=/opt/android-sdk`).
-- Verified build gate passes with:
-  - `./gradlew clean --no-daemon --console=plain`
-  - `./gradlew assembleDebug --no-daemon --console=plain`
-- Updated README with persistent sandbox SDK location + setup notes.
+## Build gate
+- `./gradlew assembleDebug --no-daemon --console=plain` passes in this sandbox.
 
 ## Notes
-- This run focused on fixing the environment blocker highlighted in the previous PR.
-- Stage 2A/2B/2C/2D feature implementation remains next once you confirm to proceed.
+- USG rendering still uses existing `RulesEngine` + `PdfGenerator` path to preserve current output behavior.
+- New OPD document templates are deterministic and use only user-entered/template text (no AI generation).

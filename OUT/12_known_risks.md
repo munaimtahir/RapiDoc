@@ -1,13 +1,13 @@
 # Known Risks / Tech Debt
 
-1. **Environment portability**: SDK path is now `/opt/android-sdk` in this sandbox; other machines must set their own `sdk.dir` in `local.properties`.
-2. **PDF overflow risk**: single-page Canvas rendering can clip long paragraphs/medicine lists without pagination.
-3. **Navigation/state debt** (pre-Stage 2A baseline): boolean-based screen switch in `MainActivity` instead of route-driven NavHost.
-4. **Settings persistence debt** (pre-Stage 2B baseline): no DataStore-backed personalization/defaults yet.
-5. **Freemium gate debt** (pre-Stage 2D baseline): no centralized feature lock policy/upsell screen currently implemented.
+1. **Simple OPD forms**: starter forms are intentionally minimal and need richer field-level validation and clinical wording review.
+2. **PDF pagination**: templates are single-page Canvas renderers; long medicine/advice/notes can overflow.
+3. **USG branding**: USG PDF path still uses legacy `PdfGenerator` and does not yet apply settings logo/header text.
+4. **Settings defaults**: per-document include-phone defaults are persisted as scaffold keys but not fully wired into all render paths.
+5. **Type-safe routes**: string routes are functional but should be centralized further to reduce route-typo risk.
 
-## Planned mitigation
-- Introduce shared PDF layout helpers with deterministic wrapping + page-break support.
-- Move to NavHost + document registry architecture.
-- Add DataStore-backed settings + factory reset.
-- Add explicit FREE/PRO gate matrix and UI state tests.
+## Mitigation path
+- Add shared paginated PDF drawing helpers.
+- Unify all docs (including USG) on one branding-aware PDF facade.
+- Expand validation UX and document-specific forms.
+- Add instrumentation smoke tests for FREE/PRO gating and print/share entry points.
