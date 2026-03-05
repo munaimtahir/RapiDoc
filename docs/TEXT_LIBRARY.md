@@ -75,8 +75,8 @@ These sentences are deterministic blocks. No AI generation in v1.
 - Left severe: Left kidney shows severe pelvicalyceal dilatation consistent with severe hydronephrosis.
 
 ### Renal stone
-- Right: A {X} mm calculus is seen in the right renal pelvis.
-- Left: A {X} mm calculus is seen in the left renal pelvis.
+- Right: A {X} mm calculus is seen in the right {LOC}.
+- Left: A {X} mm calculus is seen in the left {LOC}.
 
 ### Renal cyst
 - Without size: A simple renal cyst is seen.
@@ -103,5 +103,6 @@ These sentences are deterministic blocks. No AI generation in v1.
 ### Abnormal examples
 - Grade I fatty liver. (RED)
 - Mild bilateral hydronephrosis. (RED)
-- Moderate left hydronephrosis with {X} mm left renal pelvis calculus. (RED)
+- Moderate left hydronephrosis with left renal calculus ({X} mm) in renal pelvis. (RED)
+- Right renal calculus ({X} mm) in lower calyx (lower pole). (RED)
 - No sonographic evidence of obstruction.

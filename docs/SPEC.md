@@ -104,6 +104,7 @@ For each side:
   - default in NORMAL mode: `preserved`
 - `hydronephrosisRight` / `hydronephrosisLeft`: none/mild/moderate/severe
 - `stoneRightMm` / `stoneLeftMm`: int?
+- `stoneRightLocation` / `stoneLeftLocation`: enum (Upper calyx, Mid calyx, Lower calyx, Renal pelvis, PUJ)
 - `renalCystRight` / `renalCystLeft`: boolean
 - `renalCystRightSizeMm` / `renalCystLeftSizeMm`: int? (enabled/visible only if renalCyst = true)
 
@@ -160,6 +161,10 @@ For each side:
   - If renalCyst = true → show cyst size field.
   - If size provided → print cyst sentence including size.
   - If size missing → print cyst sentence without size.
+- Renal stone:
+  - If stone size provided → print stone sentence based on size and selected location `A {X} mm calculus is seen in the right {LOC}.`
+  - If size is cleared → location is unset.
+  - Default location if unset but size is provided → `renal pelvis`.
 
 ### 6.7 Urinary bladder (normal sentence)
 - In NORMAL mode print exactly:

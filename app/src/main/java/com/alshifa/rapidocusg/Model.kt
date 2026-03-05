@@ -16,6 +16,14 @@ enum class Ascites { NONE, MILD, MODERATE, GROSS }
 
 enum class CmdState { PRESERVED, REDUCED }
 
+enum class StoneLocation(val displayName: String) {
+    UPPER_CALYX("Upper calyx (upper pole)"),
+    MID_CALYX("Mid calyx (mid pole)"),
+    LOWER_CALYX("Lower calyx (lower pole)"),
+    RENAL_PELVIS("Renal pelvis"),
+    PUJ("Pelvi-ureteric junction (PUJ/UPJ)")
+}
+
 data class PatientInfo(
     /** Optional. If blank, it must not be printed on the report. */
     val patientId: String = "",
@@ -49,6 +57,7 @@ data class FindingsInput(
     val rkCmd: CmdState = CmdState.PRESERVED,
     val hydronephrosisRight: Hydronephrosis = Hydronephrosis.NONE,
     val stoneRightMm: String = "",
+    val stoneRightLocation: StoneLocation? = null,
     val renalCystRight: Boolean = false,
     val renalCystRightSizeMm: String = "",
 
@@ -56,6 +65,7 @@ data class FindingsInput(
     val lkCmd: CmdState = CmdState.PRESERVED,
     val hydronephrosisLeft: Hydronephrosis = Hydronephrosis.NONE,
     val stoneLeftMm: String = "",
+    val stoneLeftLocation: StoneLocation? = null,
     val renalCystLeft: Boolean = false,
     val renalCystLeftSizeMm: String = "",
 

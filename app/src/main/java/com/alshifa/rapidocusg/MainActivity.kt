@@ -545,8 +545,22 @@ private fun QuickEntryScreen(
                 onSelect = { onInputChange(reportInput.copy(findings = findings.copy(rkCmd = it))) })
             EnumSelector(label = "Hydronephrosis", options = Hydronephrosis.entries, selected = findings.hydronephrosisRight, enabled = true,
                 onSelect = { onInputChange(reportInput.copy(findings = findings.copy(hydronephrosisRight = it))) })
-            OutlinedTextField(value = findings.stoneRightMm, onValueChange = { onInputChange(reportInput.copy(findings = findings.copy(stoneRightMm = it.filter(Char::isDigit)))) },
+            OutlinedTextField(value = findings.stoneRightMm, onValueChange = { 
+                val newSize = it.filter(Char::isDigit)
+                val newLoc = if (newSize.isEmpty() || (newSize.toIntOrNull() ?: 0) <= 0) null else findings.stoneRightLocation ?: StoneLocation.RENAL_PELVIS
+                onInputChange(reportInput.copy(findings = findings.copy(stoneRightMm = newSize, stoneRightLocation = newLoc)))
+            },
                 modifier = Modifier.fillMaxWidth(), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), label = { Text("Right Renal Stone (mm)") })
+            if (findings.stoneRightMm.isNotEmpty() && (findings.stoneRightMm.toIntOrNull() ?: 0) > 0) {
+                EnumSelector(
+                    label = "Right stone location",
+                    options = StoneLocation.entries,
+                    selected = findings.stoneRightLocation ?: StoneLocation.RENAL_PELVIS,
+                    enabled = true,
+                    itemLabel = { it.displayName },
+                    onSelect = { onInputChange(reportInput.copy(findings = findings.copy(stoneRightLocation = it))) }
+                )
+            }
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text("Renal Cyst Right")
                 Spacer(Modifier.width(8.dp))
@@ -565,8 +579,22 @@ private fun QuickEntryScreen(
                 onSelect = { onInputChange(reportInput.copy(findings = findings.copy(lkCmd = it))) })
             EnumSelector(label = "Hydronephrosis", options = Hydronephrosis.entries, selected = findings.hydronephrosisLeft, enabled = true,
                 onSelect = { onInputChange(reportInput.copy(findings = findings.copy(hydronephrosisLeft = it))) })
-            OutlinedTextField(value = findings.stoneLeftMm, onValueChange = { onInputChange(reportInput.copy(findings = findings.copy(stoneLeftMm = it.filter(Char::isDigit)))) },
+            OutlinedTextField(value = findings.stoneLeftMm, onValueChange = { 
+                val newSize = it.filter(Char::isDigit)
+                val newLoc = if (newSize.isEmpty() || (newSize.toIntOrNull() ?: 0) <= 0) null else findings.stoneLeftLocation ?: StoneLocation.RENAL_PELVIS
+                onInputChange(reportInput.copy(findings = findings.copy(stoneLeftMm = newSize, stoneLeftLocation = newLoc)))
+            },
                 modifier = Modifier.fillMaxWidth(), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), label = { Text("Left Renal Stone (mm)") })
+            if (findings.stoneLeftMm.isNotEmpty() && (findings.stoneLeftMm.toIntOrNull() ?: 0) > 0) {
+                EnumSelector(
+                    label = "Left stone location",
+                    options = StoneLocation.entries,
+                    selected = findings.stoneLeftLocation ?: StoneLocation.RENAL_PELVIS,
+                    enabled = true,
+                    itemLabel = { it.displayName },
+                    onSelect = { onInputChange(reportInput.copy(findings = findings.copy(stoneLeftLocation = it))) }
+                )
+            }
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text("Renal Cyst Left")
                 Spacer(Modifier.width(8.dp))
