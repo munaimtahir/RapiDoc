@@ -58,5 +58,6 @@
 - **File timestamp format:** `yyyyMMdd_HHmm` (Locale.US).
 
 ## Observed Mismatches / Integrity Notes
-- `MainActivity.kt` currently contains literal markdown fence lines (` ```kotlin ` and ` ``` `) inside Kotlin source near `onGenerate`; this is invalid Kotlin syntax and will fail once compilation reaches source parsing.
-- Build currently fails earlier during Gradle script setup due JDK compatibility (see build evidence), so source compile is not reached in this environment.
+- `MainActivity.kt` currently contains literal markdown fence lines (` ```kotlin ` and ` ``` `) inside Kotlin source near `onGenerate`; this is invalid Kotlin syntax and will fail Kotlin compilation when source tasks execute.
+- Re-audit build finding: `clean` succeeds with JDK 21 override, but `assembleDebug` currently fails in this environment due missing Android SDK location (`ANDROID_HOME`/`sdk.dir`).
+- Default environment JDK remains 25.0.1 and still fails Gradle/Kotlin configuration unless JDK 21 is explicitly selected.

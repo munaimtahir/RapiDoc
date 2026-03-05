@@ -1,40 +1,52 @@
-RapiDocUSG build evidence (audit run)
-Timestamp (UTC): 2026-03-05T02:16:01Z
+RapiDocUSG build evidence (re-audit run)
+Timestamp (UTC, latest): 2026-03-05T02:27:47Z
 Working dir: /workspace/RapiDoc
 
+Command: git pull --ff-only
+Exit code: 1
+Summary:
+- No remote tracking is configured for current branch `work`.
+- Message: "There is no tracking information for the current branch."
+
 Command: java -version
-Result: openjdk version "25.0.1" 2025-10-21
-JAVA_HOME=/root/.local/share/mise/installs/java/25.0.1
+Result:
+- default runtime is OpenJDK 25.0.1
+- JAVA_HOME=/root/.local/share/mise/installs/java/25.0.1
 
-Command: ./gradlew clean
+Command: ./gradlew clean   (default JDK 25)
 Exit code: 1
 Summary:
-- Gradle failed during configuration.
-- Error headline: "What went wrong: 25.0.1"
+- Gradle/Kotlin fails during configuration with "What went wrong: 25.0.1"
 
-Command: ./gradlew clean --stacktrace
+Command: export JAVA_HOME=/root/.local/share/mise/installs/java/21.0.2; export PATH="$JAVA_HOME/bin:$PATH"; java -version; ./gradlew clean
+Exit code: 0
+Summary:
+- With JDK 21 override, clean succeeds.
+- Build output includes:
+  - > Task :app:clean
+  - BUILD SUCCESSFUL
+
+Command: export JAVA_HOME=/root/.local/share/mise/installs/java/21.0.2; export PATH="$JAVA_HOME/bin:$PATH"; ./gradlew assembleDebug
 Exit code: 1
 Summary:
-- Exception: java.lang.IllegalArgumentException: 25.0.1
-- Top frames include:
-  - org.jetbrains.kotlin.com.intellij.util.lang.JavaVersion.parse
-  - org.gradle.kotlin.dsl.support.KotlinCompilerKt...
-- Failure occurs before app source compilation tasks.
+- Fails at Android toolchain setup due missing SDK location.
+- Exact error:
+  - SDK location not found. Define a valid SDK location with an ANDROID_HOME environment variable
+    or by setting sdk.dir in /workspace/RapiDoc/local.properties
 
-Command: ./gradlew assembleDebug
-Exit code: 1
-Summary:
-- Same early configuration failure: "What went wrong: 25.0.1"
-
-Additional codebase integrity check:
 Command: grep -n '```' app/src/main/java/com/alshifa/rapidocusg/MainActivity.kt
 Result:
 151:```kotlin
 154:```
-Interpretation:
-- Kotlin source currently contains markdown fence tokens and will not compile once Gradle/JDK issue is addressed.
+Summary:
+- Markdown fence tokens remain embedded in Kotlin source and are expected to fail compilation
+  once SDK path is provided and Kotlin source compilation is reached.
 
-Recommended next fix steps (no changes made in this audit):
-1) Pin project build JDK to 17 or 21 (toolchain and local env) and rerun clean/assembleDebug.
-2) Remove markdown fence lines from MainActivity around onGenerate patient copy block.
-3) Re-run ./gradlew clean && ./gradlew assembleDebug and capture successful output.
+Current build status (latest):
+- clean: PASS only when using JDK 21
+- assembleDebug: FAIL due missing Android SDK path in environment
+
+Recommended next steps:
+1) Set Android SDK location (ANDROID_HOME/ANDROID_SDK_ROOT or local.properties sdk.dir).
+2) Remove markdown fence lines from MainActivity.kt around onGenerate.
+3) Re-run assembleDebug under JDK 21 (or project-supported JDK toolchain) and capture final success logs.

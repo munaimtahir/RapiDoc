@@ -1,31 +1,31 @@
-# 00 Risks — Top 10 for Stage 2 Refactor
+# 00 Risks — Top 10 for Stage 2 Refactor (Re-audit)
 
-1. **JDK/Gradle/Kotlin build break on environment JDK 25**  
-   - Current Gradle invocation fails before task execution with `IllegalArgumentException: 25.0.1`, blocking CI/dev confidence.
+1. **Android SDK path is not configured in this environment**  
+   - `assembleDebug` fails with "SDK location not found" until `ANDROID_HOME`/`sdk.dir` is set.
 
-2. **Source-level syntax corruption in `MainActivity.kt`**  
-   - Embedded markdown fences in Kotlin source (` ```kotlin ` / ` ``` `) will break Kotlin compilation once environment issue is resolved.
+2. **JDK compatibility drift (default JDK 25 vs project toolchain expectations)**  
+   - Default runtime still fails Gradle/Kotlin configuration (`IllegalArgumentException: 25.0.1`), requiring explicit JDK 21 override.
 
-3. **Monolithic UI file (`MainActivity.kt`) couples UI + state + actions**  
-   - Quick entry form, preview, persistence, PDF trigger, and back stack behavior are all in one file, increasing regression risk during refactor.
+3. **Source-level syntax corruption in `MainActivity.kt`**  
+   - Embedded markdown fences (` ```kotlin ` / ` ``` `) remain in Kotlin source and will break source compilation.
 
-4. **No ViewModel/state layer separation**  
-   - Business state currently in composable local state with direct mutation; difficult to unit test, restore process state, or evolve to multi-screen flows.
+4. **Monolithic UI file (`MainActivity.kt`) couples UI + state + actions**  
+   - Quick entry form, preview, persistence, PDF trigger, and navigation toggling are all in one file.
 
-5. **Rules engine text is hard-coded and disconnected from canonical docs**  
-   - `RulesEngine.kt` does not read `docs/TEXT_LIBRARY.md`; document/app drift risk increases as sentence library evolves.
+5. **No ViewModel/state layer separation**  
+   - Business state is local composable state; this limits testability and process-resilience during refactor.
 
-6. **Partial sample-case integration**  
-   - `surayya()` and `fayyaz()` scenarios exist but are not connected to UI/test harness, reducing practical verification of acceptance cases B/C.
+6. **Rules engine text is hard-coded and disconnected from canonical docs**  
+   - `RulesEngine.kt` does not load from `docs/TEXT_LIBRARY.md`, increasing doc/code drift risk.
 
-7. **Determinism leakage via runtime timestamps**  
-   - Generate action injects `LocalDateTime.now()` and filename timestamps, causing outputs to vary run-to-run unless normalized in test mode.
+7. **Partial sample-case integration**  
+   - `surayya()` and `fayyaz()` are defined but not wired to runtime UI/test flow, weakening acceptance validation coverage.
 
-8. **Potential text wrapping/layout overflow risks in PDF**  
-   - Single-page fixed coordinates + simple line wrapping may overflow with longer findings/impression combinations without pagination handling.
+8. **Determinism leakage via runtime timestamps**  
+   - `LocalDateTime.now()` usage for booking/reporting/file names changes outputs between runs unless controlled.
 
-9. **Print/share side effects are UI-triggered and not abstracted**  
-   - Direct platform calls (`PrintManager`, `FileProvider`) from app layer complicate deterministic testing and future modularization.
+9. **Potential PDF layout overflow under longer abnormal combinations**  
+   - Single-page static layout with simple wrapping lacks pagination/overflow safeguards.
 
-10. **Navigation dependency added but not used**  
-   - `navigation-compose` dependency present without NavHost architecture; signals architectural drift and potential confusion during Stage 2 plan.
+10. **Navigation dependency present without nav architecture usage**  
+   - `navigation-compose` is declared while screen transitions are boolean state-based, suggesting architecture drift.
