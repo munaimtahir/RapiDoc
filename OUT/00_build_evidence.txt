@@ -1,0 +1,40 @@
+RapiDocUSG build evidence (audit run)
+Timestamp (UTC): 2026-03-05T02:16:01Z
+Working dir: /workspace/RapiDoc
+
+Command: java -version
+Result: openjdk version "25.0.1" 2025-10-21
+JAVA_HOME=/root/.local/share/mise/installs/java/25.0.1
+
+Command: ./gradlew clean
+Exit code: 1
+Summary:
+- Gradle failed during configuration.
+- Error headline: "What went wrong: 25.0.1"
+
+Command: ./gradlew clean --stacktrace
+Exit code: 1
+Summary:
+- Exception: java.lang.IllegalArgumentException: 25.0.1
+- Top frames include:
+  - org.jetbrains.kotlin.com.intellij.util.lang.JavaVersion.parse
+  - org.gradle.kotlin.dsl.support.KotlinCompilerKt...
+- Failure occurs before app source compilation tasks.
+
+Command: ./gradlew assembleDebug
+Exit code: 1
+Summary:
+- Same early configuration failure: "What went wrong: 25.0.1"
+
+Additional codebase integrity check:
+Command: grep -n '```' app/src/main/java/com/alshifa/rapidocusg/MainActivity.kt
+Result:
+151:```kotlin
+154:```
+Interpretation:
+- Kotlin source currently contains markdown fence tokens and will not compile once Gradle/JDK issue is addressed.
+
+Recommended next fix steps (no changes made in this audit):
+1) Pin project build JDK to 17 or 21 (toolchain and local env) and rerun clean/assembleDebug.
+2) Remove markdown fence lines from MainActivity around onGenerate patient copy block.
+3) Re-run ./gradlew clean && ./gradlew assembleDebug and capture successful output.
