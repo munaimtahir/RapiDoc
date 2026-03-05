@@ -1,7 +1,6 @@
 package com.alshifa.rapidocusg.core.documentengine
 
 import android.content.Context
-import com.alshifa.rapidocusg.FindingsInput
 import com.alshifa.rapidocusg.ReportInput
 import java.io.File
 import java.time.LocalDate
@@ -19,7 +18,7 @@ data class PatientDemographics(
 )
 
 sealed class DocumentPayload {
-    data class UsgAbdomenPayload(val reportInput: ReportInput, val findingsInput: FindingsInput = reportInput.findings) : DocumentPayload()
+    data class UsgAbdomenPayload(val reportInput: ReportInput) : DocumentPayload()
     data class MedicalCertificatePayload(
         val patient: PatientDemographics,
         val type: String,

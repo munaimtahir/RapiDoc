@@ -6,7 +6,6 @@ import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.pdf.PdfDocument
-import android.os.Environment
 import com.alshifa.rapidocusg.R
 import java.io.File
 import java.io.FileOutputStream
@@ -65,7 +64,7 @@ object PdfGenerator {
 
         doc.finishPage(page)
 
-        val outputDir = File(context.getExternalFilesDir(Environment.DIRECTORY_DOCUMENTS), "reports")
+        val outputDir = File(context.filesDir, "reports")
         outputDir.mkdirs()
         val safeName = input.patient.name.trim().ifBlank { "Patient" }.replace("[^A-Za-z0-9]+".toRegex(), "_")
         val fileName = "USG_${safeName}_${input.patient.reportingDateTime.format(fileDateTime)}.pdf"

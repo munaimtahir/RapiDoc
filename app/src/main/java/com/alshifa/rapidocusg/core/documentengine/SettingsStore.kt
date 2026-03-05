@@ -10,7 +10,7 @@ import androidx.datastore.preferences.preferencesDataStoreFile
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.map
-import java.io.FileNotFoundException
+import java.io.IOException
 
 data class AppSettings(
     val headerText: String = "AlShifa PolyClinic",
@@ -29,7 +29,7 @@ class SettingsStore(private val context: Context) {
     )
 
     val settings: Flow<AppSettings> = dataStore.data
-        .catch { if (it is FileNotFoundException) emit(emptyPreferences()) else throw it }
+        .catch { if (it is IOException) emit(emptyPreferences()) else throw it }
         .map { prefs ->
             AppSettings(
                 headerText = prefs[KEY_HEADER] ?: "AlShifa PolyClinic",
@@ -46,11 +46,7 @@ class SettingsStore(private val context: Context) {
     suspend fun updateHeader(text: String) = dataStore.edit { it[KEY_HEADER] = text }
     suspend fun updateLogo(path: String?) = dataStore.edit { if (path == null) it.remove(KEY_LOGO) else it[KEY_LOGO] = path }
     suspend fun updatePlan(planTier: PlanTier) = dataStore.edit { it[KEY_PLAN] = planTier.name }
-    suspend fun resetFactory() = dataStore.edit {
-        it.clear()
-        it[KEY_HEADER] = "AlShifa PolyClinic"
-        it[KEY_PLAN] = PlanTier.FREE.name
-    }
+    suspend fun resetFactory() = dataStore.edit { it.clear() }
 
     companion object {
         private val KEY_HEADER = stringPreferencesKey("header_text")

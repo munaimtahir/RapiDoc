@@ -14,6 +14,9 @@ To create real clinic value quickly: **10–15 reports/day** with minimal typing
 - Demographics table has **no empty rows**
 - No stamp/signatures in v1
 
+## Requirements
+- JDK 21 is required for local Gradle/Android builds.
+
 ## Repo contents
 - `docs/SPEC.md` — canonical spec (locked)
 - `docs/TEXT_LIBRARY.md` — preset sentences (v1)
