@@ -23,3 +23,20 @@ To create real clinic value quickly: **10–15 reports/day** with minimal typing
 ## Logo
 Place your approved PolyClinic logo PNG at:
 `app/src/main/res/drawable/polyclinic_logo.png`
+
+
+## Sandbox Android SDK setup (persistent for this environment)
+The Android SDK is installed at:
+- `/opt/android-sdk`
+
+To use it in this repo, add `local.properties` (not committed by design):
+
+```properties
+sdk.dir=/opt/android-sdk
+```
+
+Installed packages in this sandbox:
+- `platform-tools`
+- `platforms;android-35`
+- `build-tools;35.0.0`
+- `build-tools;34.0.0` (auto-installed by AGP during build)
