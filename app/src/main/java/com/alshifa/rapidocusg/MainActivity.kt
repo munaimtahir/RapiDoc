@@ -2,6 +2,7 @@ package com.alshifa.rapidocusg
 
 import android.content.Context
 import android.net.Uri
+import android.content.pm.ApplicationInfo
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.pdf.PdfRenderer
@@ -83,7 +84,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.FileOutputStream
-import java.time.LocalDateTime
+import java.io.IOException
 import com.google.gson.Gson
 
 class MainActivity : ComponentActivity() {
@@ -157,8 +158,14 @@ private fun RapiDocApp() {
                 scope.launch { settingsStore.updatePlan(it) }
             }, onUpdateLogo = { uri ->
                 scope.launch {
-                    val path = uri?.let { copyLogoToInternal(context, it) }
-                    settingsStore.updateLogo(path)
+                    if (uri == null) {
+                        settingsStore.updateLogo(null)
+                    } else {
+                        val path = copyLogoToInternal(context, uri)
+                        if (path != null) {
+                            settingsStore.updateLogo(path)
+                        }
+                    }
                 }
             }, onReset = {
                 scope.launch {
@@ -181,7 +188,7 @@ private fun RapiDocApp() {
                 forceNormal = forceNormal,
                 onInputChange = { reportInput = it; forceNormal = false },
                 onForceNormal = { enabled -> forceNormal = enabled; if (enabled) reportInput = reportInput.copy(findings = FindingsInput()) },
-                onLoadNormal = {},
+                onLoadNormal = { reportInput = reportInput.copy(findings = FindingsInput()); forceNormal = false },
                 onGoPreview = { navController.navigate("doc/usg_abdomen/preview") }
             )
         }
@@ -200,22 +207,75 @@ private fun RapiDocApp() {
                     Toast.makeText(context, "PDF generated: ${rendered.pdfFile.name}", Toast.LENGTH_SHORT).show()
                 },
                 onPrint = { currentDocument?.let { PdfActions.print(context, it.pdfFile) } ?: Toast.makeText(context, "Generate PDF first.", Toast.LENGTH_SHORT).show() },
-                onNewReport = { reportInput = ReportInput(PatientInfo(), FindingsInput()); forceNormal = false; currentDocument = null; navController.navigate("home") },
+                onNewReport = {
+                    reportInput = ReportInput(PatientInfo(), FindingsInput())
+                    forceNormal = false
+                    currentDocument = null
+                    navController.navigate("home") {
+                        popUpTo("home") { inclusive = true }
+                        launchSingleTop = true
+                    }
+                },
                 onShare = { currentDocument?.let { PdfActions.share(context, it.pdfFile) } ?: Toast.makeText(context, "Generate PDF first.", Toast.LENGTH_SHORT).show() }
             )
         }
         composable("doc/{docType}/form", arguments = listOf(navArgument("docType") { type = NavType.StringType })) { backStack ->
-            val docType = backStack.arguments?.getString("docType")
-            if (docType == "usg_abdomen") return@composable
+            val docTypeArg = backStack.arguments?.getString("docType").orEmpty()
+            if (docTypeArg.isBlank()) {
+                LaunchedEffect(Unit) {
+                    navController.navigate("home") {
+                        popUpTo("home") { inclusive = true }
+                        launchSingleTop = true
+                    }
+                }
+                return@composable
+            }
+            if (docTypeArg == "usg_abdomen") {
+                LaunchedEffect(docTypeArg) {
+                    navController.navigate("doc/usg_abdomen/form") {
+                        popUpTo("doc/{docType}/form") { inclusive = true }
+                        launchSingleTop = true
+                    }
+                }
+                return@composable
+            }
+            val docTypeEnum = docTypeFromRouteArg(docTypeArg)
+            if (docTypeEnum == null || !DocumentRegistry.allowedFor(settings.planTier, docTypeEnum)) {
+                LaunchedEffect(docTypeArg, settings.planTier) { navController.navigate("upsell") }
+                return@composable
+            }
             GenericDocForm(
-                docType = docType.orEmpty(),
+                docType = docTypeArg,
                 onBack = { navController.popBackStack() },
-                onGenerated = { rendered, type -> currentDocument = rendered; currentDocType = type; navController.navigate("doc/${docType}/preview") },
+                onGenerated = { rendered, type -> currentDocument = rendered; currentDocType = type; navController.navigate("doc/${docTypeArg}/preview") },
                 settings = settings
             )
         }
         composable("doc/{docType}/preview", arguments = listOf(navArgument("docType") { type = NavType.StringType })) { backStack ->
-            val docType = backStack.arguments?.getString("docType").orEmpty()
+            val docTypeArg = backStack.arguments?.getString("docType").orEmpty()
+            if (docTypeArg.isBlank()) {
+                LaunchedEffect(Unit) {
+                    navController.navigate("home") {
+                        popUpTo("home") { inclusive = true }
+                        launchSingleTop = true
+                    }
+                }
+                return@composable
+            }
+            if (docTypeArg == "usg_abdomen") {
+                LaunchedEffect(docTypeArg) {
+                    navController.navigate("doc/usg_abdomen/preview") {
+                        popUpTo("doc/{docType}/preview") { inclusive = true }
+                        launchSingleTop = true
+                    }
+                }
+                return@composable
+            }
+            val docTypeEnum = docTypeFromRouteArg(docTypeArg)
+            if (docTypeEnum == null || !DocumentRegistry.allowedFor(settings.planTier, docTypeEnum)) {
+                LaunchedEffect(docTypeArg, settings.planTier) { navController.navigate("upsell") }
+                return@composable
+            }
             Column(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text("Preview", style = MaterialTheme.typography.headlineSmall)
                 Text("${currentDocument?.displayName ?: "Document"}")
@@ -224,11 +284,25 @@ private fun RapiDocApp() {
                     Button(onClick = { currentDocument?.let { PdfActions.print(context, it.pdfFile) } }) { Text("Print") }
                     Button(onClick = { currentDocument?.let { PdfActions.share(context, it.pdfFile) } }) { Text("Share") }
                 }
-                TextButton(onClick = { navController.navigate("doc/$docType/form") }) { Text("Back to Form") }
-                TextButton(onClick = { navController.navigate("home") }) { Text("Home") }
+                TextButton(onClick = { navController.navigate("doc/$docTypeArg/form") }) { Text("Back to Form") }
+                TextButton(onClick = {
+                    navController.navigate("home") {
+                        popUpTo("home") { inclusive = true }
+                        launchSingleTop = true
+                    }
+                }) { Text("Home") }
             }
         }
     }
+}
+
+private fun docTypeFromRouteArg(docTypeArg: String): DocumentType? = when (docTypeArg) {
+    "usg_abdomen" -> DocumentType.USG_ABDOMEN
+    "medical_certificate" -> DocumentType.MEDICAL_CERTIFICATE
+    "prescription" -> DocumentType.PRESCRIPTION
+    "lab_request_slip" -> DocumentType.LAB_REQUEST_SLIP
+    "radiology_request_slip" -> DocumentType.RADIOLOGY_REQUEST_SLIP
+    else -> null
 }
 
 @Composable
@@ -242,6 +316,8 @@ private fun SettingsScreen(
 ) {
     var header by remember(settings.headerText) { mutableStateOf(settings.headerText) }
     var showReset by remember { mutableStateOf(false) }
+    val context = LocalContext.current
+    val isDebugBuild = (context.applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE) != 0
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri -> onUpdateLogo(uri) }
     Column(Modifier.fillMaxSize().padding(16.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Text("Settings", style = MaterialTheme.typography.headlineSmall)
@@ -258,10 +334,12 @@ private fun SettingsScreen(
         settings.logoPath?.let {
             BitmapFactory.decodeFile(it)?.let { bmp -> Image(bitmap = bmp.asImageBitmap(), contentDescription = "logo", modifier = Modifier.size(100.dp)) }
         }
-        Text("Plan Tier")
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Button(onClick = { onUpdatePlan(PlanTier.FREE) }) { Text("FREE") }
-            Button(onClick = { onUpdatePlan(PlanTier.PRO) }) { Text("PRO") }
+        if (isDebugBuild) {
+            Text("Plan Tier")
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Button(onClick = { onUpdatePlan(PlanTier.FREE) }) { Text("FREE") }
+                Button(onClick = { onUpdatePlan(PlanTier.PRO) }) { Text("PRO") }
+            }
         }
         Button(onClick = { showReset = true }, colors = ButtonDefaults.buttonColors(containerColor = Color.Red)) { Text("Factory Reset") }
         if (showReset) {
@@ -291,8 +369,6 @@ private fun GenericDocForm(
     var line2 by remember { mutableStateOf("") }
     var line3 by remember { mutableStateOf("") }
     var urgent by remember { mutableStateOf(false) }
-    val now = SystemTimeProvider.now()
-    val timing = TimingConfig(now.minusMinutes(20), now)
     val patient = PatientDemographics(name = name, age = age, gender = gender, phone = phone)
 
     Column(Modifier.fillMaxSize().padding(16.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -307,24 +383,37 @@ private fun GenericDocForm(
         if (docType == "radiology_request_slip") Row(verticalAlignment = Alignment.CenterVertically) { Text("Urgent"); Switch(urgent, { urgent = it }) }
         Button(onClick = {
             val branding = BrandingConfig(settings.headerText, settings.logoPath)
-            val rendered = when (docType) {
-                "medical_certificate" -> MedicalCertificateRenderer.render(context, DocumentPayload.MedicalCertificatePayload(patient, line1.ifBlank { "Leave" }, line2, java.time.LocalDate.now(), java.time.LocalDate.now().plusDays(3), line3), branding, timing) to DocumentType.MEDICAL_CERTIFICATE
-                "prescription" -> PrescriptionRenderer.render(context, DocumentPayload.PrescriptionPayload(patient, line1, listOf(DocumentPayload.PrescriptionPayload.MedicineRow(line2, line3, "", ""))), branding, timing) to DocumentType.PRESCRIPTION
-                "lab_request_slip" -> LabRequestRenderer.render(context, DocumentPayload.LabRequestPayload(patient, listOfNotNull(line1.takeIf { it.isNotBlank() }, line2.takeIf { it.isNotBlank() }), line3), branding, timing) to DocumentType.LAB_REQUEST_SLIP
-                else -> RadiologyRequestRenderer.render(context, DocumentPayload.RadiologyRequestPayload(patient, line1, line2, line3, urgent), branding, timing) to DocumentType.RADIOLOGY_REQUEST_SLIP
-            }
+            val now = SystemTimeProvider.now()
+            val timing = TimingConfig(now.minusMinutes(20), now)
+            val rendered = runCatching {
+                when (docType) {
+                    "medical_certificate" -> MedicalCertificateRenderer.render(context, DocumentPayload.MedicalCertificatePayload(patient, line1.ifBlank { "Leave" }, line2, java.time.LocalDate.now(), java.time.LocalDate.now().plusDays(3), line3), branding, timing) to DocumentType.MEDICAL_CERTIFICATE
+                    "prescription" -> PrescriptionRenderer.render(context, DocumentPayload.PrescriptionPayload(patient, line1, listOf(DocumentPayload.PrescriptionPayload.MedicineRow(line2, line3, "", ""))), branding, timing) to DocumentType.PRESCRIPTION
+                    "lab_request_slip" -> LabRequestRenderer.render(context, DocumentPayload.LabRequestPayload(patient, listOfNotNull(line1.takeIf { it.isNotBlank() }, line2.takeIf { it.isNotBlank() }), line3), branding, timing) to DocumentType.LAB_REQUEST_SLIP
+                    "radiology_request_slip" -> RadiologyRequestRenderer.render(context, DocumentPayload.RadiologyRequestPayload(patient, line1, line2, line3, urgent), branding, timing) to DocumentType.RADIOLOGY_REQUEST_SLIP
+                    else -> throw IllegalArgumentException("Unsupported document type: $docType")
+                }
+            }.onFailure {
+                Toast.makeText(context, "Unsupported document type.", Toast.LENGTH_SHORT).show()
+            }.getOrNull() ?: return@Button
             onGenerated(rendered.first, rendered.second)
         }, enabled = name.isNotBlank()) { Text("Generate PDF") }
         TextButton(onClick = onBack) { Text("Back") }
     }
 }
 
-private fun copyLogoToInternal(context: Context, uri: Uri): String {
+private fun copyLogoToInternal(context: Context, uri: Uri): String? {
+    val input = context.contentResolver.openInputStream(uri) ?: return null
     val outFile = File(context.filesDir, "branding_logo.png")
-    context.contentResolver.openInputStream(uri)?.use { input ->
-        FileOutputStream(outFile).use { output -> input.copyTo(output) }
+    return try {
+        input.use { stream ->
+            FileOutputStream(outFile).use { output -> stream.copyTo(output) }
+        }
+        outFile.absolutePath
+    } catch (_: IOException) {
+        runCatching { outFile.delete() }
+        null
     }
-    return outFile.absolutePath
 }
 
 @Composable
@@ -339,6 +428,8 @@ private fun QuickEntryScreen(
     onGoPreview: () -> Unit
 ) {
     val findings = reportInput.findings
+    val context = LocalContext.current
+    val isDebugBuild = (context.applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE) != 0
 
     Column(
         modifier = modifier
@@ -501,10 +592,12 @@ private fun QuickEntryScreen(
             onModeChange = { onInputChange(reportInput.copy(findings = findings.copy(bladderPrintMode = it))) }) {
         }
 
-        Spacer(Modifier.height(4.dp))
-        Text("Load Sample Case", fontWeight = FontWeight.Bold)
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Button(onClick = onLoadNormal) { Text("Normal") }
+        if (isDebugBuild) {
+            Spacer(Modifier.height(4.dp))
+            Text("Load Sample Case", fontWeight = FontWeight.Bold)
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Button(onClick = onLoadNormal) { Text("Normal") }
+            }
         }
 
         Spacer(Modifier.height(6.dp))

@@ -7,7 +7,6 @@ import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.RectF
 import android.graphics.pdf.PdfDocument
-import android.os.Environment
 import com.alshifa.rapidocusg.PdfGenerator
 import com.alshifa.rapidocusg.RulesEngine
 import java.io.File
@@ -59,7 +58,7 @@ private object SimpleDocPdf {
             y += 4f
         }
         doc.finishPage(page)
-        val outputDir = File(context.getExternalFilesDir(Environment.DIRECTORY_DOCUMENTS), "reports")
+        val outputDir = File(context.filesDir, "reports")
         outputDir.mkdirs()
         val safeName = patient.name.replace("[^A-Za-z0-9]+".toRegex(), "_")
         val file = File(outputDir, "${title.replace(' ','_')}_${safeName}_${timing.reporting.format(fileDateTime)}.pdf")
