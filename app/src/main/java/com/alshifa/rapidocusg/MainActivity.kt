@@ -58,6 +58,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.HorizontalDivider
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -68,12 +70,15 @@ import com.alshifa.rapidocusg.core.documentengine.BrandingConfig
 import com.alshifa.rapidocusg.core.documentengine.DocumentPayload
 import com.alshifa.rapidocusg.core.documentengine.DocumentRegistry
 import com.alshifa.rapidocusg.core.documentengine.DocumentType
-import com.alshifa.rapidocusg.core.documentengine.LabRequestRenderer
-import com.alshifa.rapidocusg.core.documentengine.MedicalCertificateRenderer
-import com.alshifa.rapidocusg.core.documentengine.PatientDemographics
-import com.alshifa.rapidocusg.core.documentengine.PlanTier
-import com.alshifa.rapidocusg.core.documentengine.PrescriptionRenderer
-import com.alshifa.rapidocusg.core.documentengine.RadiologyRequestRenderer
+import com.alshifa.rapidocusg.core.documentengine.LeaveCertificateRenderer
+import com.alshifa.rapidocusg.core.documentengine.FitnessCertificateRenderer
+import com.alshifa.rapidocusg.ui.screens.LeaveCertificateFormScreen
+import com.alshifa.rapidocusg.ui.screens.FitnessCertificateFormScreen
+import com.alshifa.rapidocusg.ui.screens.ParserDictionaryScreen
+import com.alshifa.rapidocusg.core.parser.ChatParser
+import com.alshifa.rapidocusg.core.parser.ParseResult
+import com.alshifa.rapidocusg.core.parser.SystemKeywords
+import com.alshifa.rapidocusg.core.parser.ParseConfidence
 import com.alshifa.rapidocusg.core.documentengine.RenderedDocument
 import com.alshifa.rapidocusg.core.documentengine.SettingsStore
 import com.alshifa.rapidocusg.core.documentengine.SystemTimeProvider
@@ -128,6 +133,11 @@ private fun RapiDocApp() {
     var currentDocument by remember { mutableStateOf<RenderedDocument?>(null) }
     var currentDocType by remember { mutableStateOf(DocumentType.USG_ABDOMEN) }
 
+    var parseResult by remember { mutableStateOf<ParseResult?>(null) }
+    var rawQuickEntry by remember { mutableStateOf("") }
+    var showDocPicker by remember { mutableStateOf(false) }
+    var initialFields by remember { mutableStateOf<Map<String, Any>>(emptyMap()) }
+
     LaunchedEffect(reportInput.findings) {
         prefs.edit().putString("pref_findings", gson.toJson(reportInput.findings)).apply()
     }
@@ -137,25 +147,122 @@ private fun RapiDocApp() {
     NavHost(navController = navController, startDestination = "home") {
         composable("home") {
             Scaffold { padding ->
-                Column(Modifier.padding(padding).fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Column(Modifier.padding(padding).fillMaxSize().padding(16.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text("RapiDoc", style = MaterialTheme.typography.headlineSmall)
-                    DocumentRegistry.docs.forEach { meta ->
-                        val locked = !DocumentRegistry.allowedFor(settings.planTier, meta.type)
+                    
+                    Text("Quick Entry", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                    Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        OutlinedTextField(
+                            value = rawQuickEntry,
+                            onValueChange = { rawQuickEntry = it },
+                            modifier = Modifier.weight(1f),
+                            label = { Text("Command") }
+                        )
+                        Spacer(Modifier.width(8.dp))
                         Button(onClick = {
-                            if (locked) navController.navigate("upsell") else navController.navigate(meta.formRoute)
+                            val mapType = object : com.google.gson.reflect.TypeToken<Map<String, String>>() {}.type
+                            val mappings: Map<String, String> = if (settings.parserSynonymsJson.isBlank() || settings.parserSynonymsJson == "{}") {
+                                emptyMap()
+                            } else {
+                                runCatching { gson.fromJson<Map<String, String>>(settings.parserSynonymsJson, mapType) }.getOrDefault(emptyMap())
+                            }
+                            val res = ChatParser.parse(rawQuickEntry, mappings)
+                            parseResult = res
+                            initialFields = res.filledFields
+                            if (res.confidence == ParseConfidence.LOW || res.confidence == ParseConfidence.NONE || res.detectedDocType == null) {
+                                showDocPicker = true
+                            } else {
+                                // Navigate mapped fields directly
+                                if (res.detectedDocType == DocumentType.USG_ABDOMEN) {
+                                    reportInput = reportInput.copy(
+                                        patient = reportInput.patient.copy(
+                                            name = (res.filledFields[SystemKeywords.KEY_NAME] as? String) ?: reportInput.patient.name,
+                                            ageYears = (res.filledFields[SystemKeywords.KEY_AGE] as? String) ?: reportInput.patient.ageYears,
+                                            sex = when ((res.filledFields[SystemKeywords.KEY_SEX] as? String)?.lowercase()) {
+                                                "male", "m" -> Sex.Male
+                                                "female", "f" -> Sex.Female
+                                                else -> reportInput.patient.sex
+                                            },
+                                        )
+                                    )
+                                    navController.navigate("doc/usg_abdomen/form")
+                                } else {
+                                    val route = DocumentRegistry.byType(res.detectedDocType).formRoute
+                                    navController.navigate(route)
+                                }
+                            }
+                        }) { Text("Parse") }
+                    }
+
+                    if (parseResult != null) {
+                        Column(modifier = Modifier.fillMaxWidth().background(Color(0xFFE3F2FD)).padding(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            Text("Parsed Summary", fontWeight = FontWeight.Bold)
+                            val res = parseResult!!
+                            Text("Detected: ${res.detectedDocType?.name ?: "Unknown"} [${res.confidence.name}]", color = if (res.confidence == ParseConfidence.HIGH) Color(0xFF2E7D32) else Color(0xFFC62828))
+                            Text("Filled: ${res.filledFields}")
+                            if (res.missingRequired.isNotEmpty()) Text("Missing: ${res.missingRequired}", color = Color.Red)
+                            if (res.unknownTokens.isNotEmpty()) Text("Unknown: ${res.unknownTokens}", color = Color(0xFFE65100))
+                        }
+                    }
+
+                    if (showDocPicker) {
+                        AlertDialog(
+                            onDismissRequest = { showDocPicker = false },
+                            title = { Text("Choose Document") },
+                            text = { Text("Could not determine document type. Please select:") },
+                            confirmButton = {},
+                            dismissButton = {
+                                Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    DocumentRegistry.docs.forEach { m ->
+                                        Button(onClick = {
+                                            showDocPicker = false
+                                            if (m.type == DocumentType.USG_ABDOMEN) {
+                                                reportInput = reportInput.copy(
+                                                    patient = reportInput.patient.copy(
+                                                        name = (initialFields[SystemKeywords.KEY_NAME] as? String) ?: reportInput.patient.name,
+                                                        ageYears = (initialFields[SystemKeywords.KEY_AGE] as? String) ?: reportInput.patient.ageYears,
+                                                        sex = when ((initialFields[SystemKeywords.KEY_SEX] as? String)?.lowercase()) {
+                                                            "male", "m" -> Sex.Male
+                                                            "female", "f" -> Sex.Female
+                                                            else -> reportInput.patient.sex
+                                                        },
+                                                    )
+                                                )
+                                                navController.navigate(m.formRoute)
+                                            } else {
+                                                navController.navigate(m.formRoute)
+                                            }
+                                        }, modifier = Modifier.fillMaxWidth()) { Text(m.displayName) }
+                                    }
+                                    TextButton(onClick = { showDocPicker = false }) { Text("Cancel") }
+                                }
+                            }
+                        )
+                    }
+
+                    HorizontalDivider()
+                    DocumentRegistry.docs.forEach { meta ->
+                        Button(onClick = {
+                            navController.navigate(meta.formRoute)
                         }, enabled = true, modifier = Modifier.fillMaxWidth()) {
-                            Text(meta.displayName + if (locked) " (PRO)" else "")
+                            Text(meta.displayName)
                         }
                     }
                     TextButton(onClick = { navController.navigate("settings") }) { Text("Settings") }
+                    TextButton(onClick = { navController.navigate("dictionary") }) { Text("Parser Dictionary") }
                 }
             }
+        }
+        composable("dictionary") {
+            ParserDictionaryScreen(
+                settings = settings,
+                settingsStore = settingsStore,
+                onBack = { navController.popBackStack() }
+            )
         }
         composable("settings") {
             SettingsScreen(settings = settings, onBack = { navController.popBackStack() }, onUpdateHeader = {
                 scope.launch { settingsStore.updateHeader(it) }
-            }, onUpdatePlan = {
-                scope.launch { settingsStore.updatePlan(it) }
             }, onUpdateLogo = { uri ->
                 scope.launch {
                     if (uri == null) {
@@ -174,13 +281,7 @@ private fun RapiDocApp() {
                 }
             })
         }
-        composable("upsell") {
-            Column(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Text("PRO Feature", style = MaterialTheme.typography.headlineSmall)
-                Text("Upgrade to PRO to unlock all document types and personalization settings.")
-                TextButton(onClick = { navController.popBackStack() }) { Text("Back") }
-            }
-        }
+
         composable("doc/usg_abdomen/form") {
             QuickEntryScreen(
                 modifier = Modifier.fillMaxSize(),
@@ -219,36 +320,20 @@ private fun RapiDocApp() {
                 onShare = { currentDocument?.let { PdfActions.share(context, it.pdfFile) } ?: Toast.makeText(context, "Generate PDF first.", Toast.LENGTH_SHORT).show() }
             )
         }
-        composable("doc/{docType}/form", arguments = listOf(navArgument("docType") { type = NavType.StringType })) { backStack ->
-            val docTypeArg = backStack.arguments?.getString("docType").orEmpty()
-            if (docTypeArg.isBlank()) {
-                LaunchedEffect(Unit) {
-                    navController.navigate("home") {
-                        popUpTo("home") { inclusive = true }
-                        launchSingleTop = true
-                    }
-                }
-                return@composable
-            }
-            if (docTypeArg == "usg_abdomen") {
-                LaunchedEffect(docTypeArg) {
-                    navController.navigate("doc/usg_abdomen/form") {
-                        popUpTo("doc/{docType}/form") { inclusive = true }
-                        launchSingleTop = true
-                    }
-                }
-                return@composable
-            }
-            val docTypeEnum = docTypeFromRouteArg(docTypeArg)
-            if (docTypeEnum == null || !DocumentRegistry.allowedFor(settings.planTier, docTypeEnum)) {
-                LaunchedEffect(docTypeArg, settings.planTier) { navController.navigate("upsell") }
-                return@composable
-            }
-            GenericDocForm(
-                docType = docTypeArg,
+        composable("doc/medical_leave_cert/form") {
+            LeaveCertificateFormScreen(
+                settings = settings,
+                initialFields = initialFields,
                 onBack = { navController.popBackStack() },
-                onGenerated = { rendered, type -> currentDocument = rendered; currentDocType = type; navController.navigate("doc/${docTypeArg}/preview") },
-                settings = settings
+                onGenerated = { rendered, type -> currentDocument = rendered; currentDocType = type; navController.navigate("doc/medical_leave_cert/preview") }
+            )
+        }
+        composable("doc/medical_fitness_cert/form") {
+            FitnessCertificateFormScreen(
+                settings = settings,
+                initialFields = initialFields,
+                onBack = { navController.popBackStack() },
+                onGenerated = { rendered, type -> currentDocument = rendered; currentDocType = type; navController.navigate("doc/medical_fitness_cert/preview") }
             )
         }
         composable("doc/{docType}/preview", arguments = listOf(navArgument("docType") { type = NavType.StringType })) { backStack ->
@@ -272,8 +357,8 @@ private fun RapiDocApp() {
                 return@composable
             }
             val docTypeEnum = docTypeFromRouteArg(docTypeArg)
-            if (docTypeEnum == null || !DocumentRegistry.allowedFor(settings.planTier, docTypeEnum)) {
-                LaunchedEffect(docTypeArg, settings.planTier) { navController.navigate("upsell") }
+            if (docTypeEnum == null) {
+                LaunchedEffect(docTypeArg) { navController.navigate("home") }
                 return@composable
             }
             Column(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -298,10 +383,8 @@ private fun RapiDocApp() {
 
 private fun docTypeFromRouteArg(docTypeArg: String): DocumentType? = when (docTypeArg) {
     "usg_abdomen" -> DocumentType.USG_ABDOMEN
-    "medical_certificate" -> DocumentType.MEDICAL_CERTIFICATE
-    "prescription" -> DocumentType.PRESCRIPTION
-    "lab_request_slip" -> DocumentType.LAB_REQUEST_SLIP
-    "radiology_request_slip" -> DocumentType.RADIOLOGY_REQUEST_SLIP
+    "medical_leave_cert" -> DocumentType.MEDICAL_LEAVE_CERT
+    "medical_fitness_cert" -> DocumentType.MEDICAL_FITNESS_CERT
     else -> null
 }
 
@@ -310,7 +393,6 @@ private fun SettingsScreen(
     settings: AppSettings,
     onBack: () -> Unit,
     onUpdateHeader: (String) -> Unit,
-    onUpdatePlan: (PlanTier) -> Unit,
     onUpdateLogo: (Uri?) -> Unit,
     onReset: () -> Unit
 ) {
@@ -323,23 +405,12 @@ private fun SettingsScreen(
         Text("Settings", style = MaterialTheme.typography.headlineSmall)
         OutlinedTextField(value = header, onValueChange = { header = it }, label = { Text("Header text") }, modifier = Modifier.fillMaxWidth())
         Button(onClick = { onUpdateHeader(header) }) { Text("Save Header") }
-        if (settings.planTier == PlanTier.PRO) {
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(onClick = { picker.launch("image/*") }) { Text("Upload Logo") }
-                Button(onClick = { onUpdateLogo(null) }) { Text("Clear Logo") }
-            }
-        } else {
-            Text("Logo customization is PRO only")
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Button(onClick = { picker.launch("image/*") }) { Text("Upload Logo") }
+            Button(onClick = { onUpdateLogo(null) }) { Text("Clear Logo") }
         }
         settings.logoPath?.let {
             BitmapFactory.decodeFile(it)?.let { bmp -> Image(bitmap = bmp.asImageBitmap(), contentDescription = "logo", modifier = Modifier.size(100.dp)) }
-        }
-        if (isDebugBuild) {
-            Text("Plan Tier")
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(onClick = { onUpdatePlan(PlanTier.FREE) }) { Text("FREE") }
-                Button(onClick = { onUpdatePlan(PlanTier.PRO) }) { Text("PRO") }
-            }
         }
         Button(onClick = { showReset = true }, colors = ButtonDefaults.buttonColors(containerColor = Color.Red)) { Text("Factory Reset") }
         if (showReset) {
@@ -353,54 +424,7 @@ private fun SettingsScreen(
     }
 }
 
-@Composable
-private fun GenericDocForm(
-    docType: String,
-    settings: AppSettings,
-    onBack: () -> Unit,
-    onGenerated: (RenderedDocument, DocumentType) -> Unit
-) {
-    val context = LocalContext.current
-    var name by remember { mutableStateOf("") }
-    var age by remember { mutableStateOf("") }
-    var gender by remember { mutableStateOf("") }
-    var phone by remember { mutableStateOf("") }
-    var line1 by remember { mutableStateOf("") }
-    var line2 by remember { mutableStateOf("") }
-    var line3 by remember { mutableStateOf("") }
-    var urgent by remember { mutableStateOf(false) }
-    val patient = PatientDemographics(name = name, age = age, gender = gender, phone = phone)
 
-    Column(Modifier.fillMaxSize().padding(16.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text(docType.replace('_', ' ').uppercase(), style = MaterialTheme.typography.headlineSmall)
-        OutlinedTextField(name, { name = it }, label = { Text("Patient Name*") }, modifier = Modifier.fillMaxWidth())
-        OutlinedTextField(age, { age = it }, label = { Text("Age") }, modifier = Modifier.fillMaxWidth())
-        OutlinedTextField(gender, { gender = it }, label = { Text("Gender") }, modifier = Modifier.fillMaxWidth())
-        OutlinedTextField(phone, { phone = it }, label = { Text("Phone") }, modifier = Modifier.fillMaxWidth())
-        OutlinedTextField(line1, { line1 = it }, label = { Text("Field 1") }, modifier = Modifier.fillMaxWidth())
-        OutlinedTextField(line2, { line2 = it }, label = { Text("Field 2") }, modifier = Modifier.fillMaxWidth())
-        OutlinedTextField(line3, { line3 = it }, label = { Text("Field 3") }, modifier = Modifier.fillMaxWidth())
-        if (docType == "radiology_request_slip") Row(verticalAlignment = Alignment.CenterVertically) { Text("Urgent"); Switch(urgent, { urgent = it }) }
-        Button(onClick = {
-            val branding = BrandingConfig(settings.headerText, settings.logoPath)
-            val now = SystemTimeProvider.now()
-            val timing = TimingConfig(now.minusMinutes(20), now)
-            val rendered = runCatching {
-                when (docType) {
-                    "medical_certificate" -> MedicalCertificateRenderer.render(context, DocumentPayload.MedicalCertificatePayload(patient, line1.ifBlank { "Leave" }, line2, java.time.LocalDate.now(), java.time.LocalDate.now().plusDays(3), line3), branding, timing) to DocumentType.MEDICAL_CERTIFICATE
-                    "prescription" -> PrescriptionRenderer.render(context, DocumentPayload.PrescriptionPayload(patient, line1, listOf(DocumentPayload.PrescriptionPayload.MedicineRow(line2, line3, "", ""))), branding, timing) to DocumentType.PRESCRIPTION
-                    "lab_request_slip" -> LabRequestRenderer.render(context, DocumentPayload.LabRequestPayload(patient, listOfNotNull(line1.takeIf { it.isNotBlank() }, line2.takeIf { it.isNotBlank() }), line3), branding, timing) to DocumentType.LAB_REQUEST_SLIP
-                    "radiology_request_slip" -> RadiologyRequestRenderer.render(context, DocumentPayload.RadiologyRequestPayload(patient, line1, line2, line3, urgent), branding, timing) to DocumentType.RADIOLOGY_REQUEST_SLIP
-                    else -> throw IllegalArgumentException("Unsupported document type: $docType")
-                }
-            }.onFailure {
-                Toast.makeText(context, "Unsupported document type.", Toast.LENGTH_SHORT).show()
-            }.getOrNull() ?: return@Button
-            onGenerated(rendered.first, rendered.second)
-        }, enabled = name.isNotBlank()) { Text("Generate PDF") }
-        TextButton(onClick = onBack) { Text("Back") }
-    }
-}
 
 private fun copyLogoToInternal(context: Context, uri: Uri): String? {
     val input = context.contentResolver.openInputStream(uri) ?: return null

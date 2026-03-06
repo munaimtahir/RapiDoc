@@ -104,67 +104,54 @@ private object SimpleDocPdf {
     }
 }
 
-object MedicalCertificateRenderer : DocumentRenderer<DocumentPayload.MedicalCertificatePayload> {
-    override val type = DocumentType.MEDICAL_CERTIFICATE
-    override fun validate(payload: DocumentPayload.MedicalCertificatePayload): List<String> = buildList {
+object LeaveCertificateRenderer : DocumentRenderer<DocumentPayload.LeaveCertificatePayload> {
+    override val type = DocumentType.MEDICAL_LEAVE_CERT
+    override fun validate(payload: DocumentPayload.LeaveCertificatePayload): List<String> = buildList {
         if (payload.patient.name.isBlank()) add("Patient name required")
-        if (payload.diagnosis.isBlank()) add("Diagnosis required")
+        if (payload.patient.age.isNullOrBlank()) add("Age required")
+        if (payload.diagnosisOrReason.isBlank()) add("Diagnosis/Reason required")
     }
-    override fun render(context: Context, payload: DocumentPayload.MedicalCertificatePayload, branding: BrandingConfig, timing: TimingConfig): RenderedDocument {
-        val lines = mutableListOf(
-            "This is to certify that ${payload.patient.name} is diagnosed with ${payload.diagnosis}.",
-            "Certificate Type: ${payload.type}.",
-            "Recommended dates: ${payload.fromDate} to ${payload.toDate}."
-        )
-        if (payload.remarks.isNotBlank()) lines += "Remarks: ${payload.remarks}"
-        lines += "Doctor Signature: ______________________"
-        val file = SimpleDocPdf.render(context, "Medical Certificate", branding, timing, payload.patient, lines)
-        return RenderedDocument(file, "Medical Certificate")
-    }
-}
-
-object PrescriptionRenderer : DocumentRenderer<DocumentPayload.PrescriptionPayload> {
-    override val type = DocumentType.PRESCRIPTION
-    override fun validate(payload: DocumentPayload.PrescriptionPayload): List<String> = if (payload.medicines.isEmpty()) listOf("At least one medicine required") else emptyList()
-    override fun render(context: Context, payload: DocumentPayload.PrescriptionPayload, branding: BrandingConfig, timing: TimingConfig): RenderedDocument {
+    
+    override fun render(context: Context, payload: DocumentPayload.LeaveCertificatePayload, branding: BrandingConfig, timing: TimingConfig): RenderedDocument {
+        val dtFormatter = DateTimeFormatter.ofPattern("dd MMM yyyy")
         val lines = mutableListOf<String>()
-        if (payload.diagnosis.isNotBlank()) lines += "Diagnosis: ${payload.diagnosis}"
-        payload.medicines.forEachIndexed { index, row ->
-            lines += "${index + 1}. ${row.drugName} | ${row.dose} | ${row.frequency} | ${row.duration}${if (row.instructions.isNotBlank()) " | ${row.instructions}" else ""}"
+        val startStr = payload.startDate.format(dtFormatter)
+        val endStr = payload.endDate.format(dtFormatter)
+        
+        lines += "This is to certify that Mr/Ms ${payload.patient.name}, aged ${payload.patient.age} years, was examined and is advised rest for ${payload.durationDays} day(s) from $startStr to $endStr due to ${payload.diagnosisOrReason}."
+        if (payload.notes.isNotBlank()) {
+            lines += "Notes: ${payload.notes}"
         }
-        if (payload.advice.isNotBlank()) lines += "Advice: ${payload.advice}"
-        payload.followUpDate?.let { lines += "Follow-up: $it" }
-        val file = SimpleDocPdf.render(context, "Prescription", branding, timing, payload.patient, lines)
-        return RenderedDocument(file, "Prescription")
+        lines += ""
+        lines += "This certificate is issued based on clinical examination. Verification may be required where applicable."
+        
+        val file = SimpleDocPdf.render(context, "Medical Leave Certificate", branding, timing, payload.patient, lines)
+        return RenderedDocument(file, "Medical Leave Certificate")
     }
 }
 
-object LabRequestRenderer : DocumentRenderer<DocumentPayload.LabRequestPayload> {
-    override val type = DocumentType.LAB_REQUEST_SLIP
-    override fun validate(payload: DocumentPayload.LabRequestPayload): List<String> = if (payload.selectedLabs.isEmpty() && payload.other.isBlank()) listOf("Select at least one investigation") else emptyList()
-    override fun render(context: Context, payload: DocumentPayload.LabRequestPayload, branding: BrandingConfig, timing: TimingConfig): RenderedDocument {
-        val lines = mutableListOf("Requested investigations:")
-        lines += payload.selectedLabs.map { "- $it" }
-        if (payload.other.isNotBlank()) lines += "Other: ${payload.other}"
-        val file = SimpleDocPdf.render(context, "Lab Investigation Request", branding, timing, payload.patient, lines)
-        return RenderedDocument(file, "Lab Request Slip")
+object FitnessCertificateRenderer : DocumentRenderer<DocumentPayload.FitnessCertificatePayload> {
+    override val type = DocumentType.MEDICAL_FITNESS_CERT
+    override fun validate(payload: DocumentPayload.FitnessCertificatePayload): List<String> = buildList {
+        if (payload.patient.name.isBlank()) add("Patient name required")
+        if (payload.patient.age.isNullOrBlank()) add("Age required")
+        if (payload.purposeText.isBlank()) add("Purpose required")
     }
-}
-
-object RadiologyRequestRenderer : DocumentRenderer<DocumentPayload.RadiologyRequestPayload> {
-    override val type = DocumentType.RADIOLOGY_REQUEST_SLIP
-    override fun validate(payload: DocumentPayload.RadiologyRequestPayload): List<String> = buildList {
-        if (payload.modality.isBlank()) add("Modality required")
-        if (payload.studyName.isBlank()) add("Study name required")
-    }
-    override fun render(context: Context, payload: DocumentPayload.RadiologyRequestPayload, branding: BrandingConfig, timing: TimingConfig): RenderedDocument {
-        val lines = listOf(
-            "Modality: ${payload.modality}",
-            "Study: ${payload.studyName}",
-            "Clinical notes: ${payload.clinicalNotes}",
-            "Urgency: ${if (payload.urgent) "Urgent" else "Routine"}"
-        )
-        val file = SimpleDocPdf.render(context, "Radiology Request", branding, timing, payload.patient, lines)
-        return RenderedDocument(file, "Radiology Request Slip")
+    
+    override fun render(context: Context, payload: DocumentPayload.FitnessCertificatePayload, branding: BrandingConfig, timing: TimingConfig): RenderedDocument {
+        val lines = mutableListOf<String>()
+        
+        lines += "This is to certify that Mr/Ms ${payload.patient.name}, aged ${payload.patient.age} years, was examined and is found medically fit for ${payload.purposeText}."
+        if (!payload.restrictionsText.isNullOrBlank()) {
+            lines += "Restrictions: ${payload.restrictionsText}"
+        }
+        if (payload.remarks.isNotBlank()) {
+            lines += "Remarks: ${payload.remarks}"
+        }
+        lines += ""
+        lines += "This certificate is issued based on clinical examination. Verification may be required where applicable."
+        
+        val file = SimpleDocPdf.render(context, "Medical Fitness Certificate", branding, timing, payload.patient, lines)
+        return RenderedDocument(file, "Medical Fitness Certificate")
     }
 }

@@ -6,8 +6,7 @@ import java.io.File
 import java.time.LocalDate
 import java.time.LocalDateTime
 
-enum class DocumentType { USG_ABDOMEN, MEDICAL_CERTIFICATE, PRESCRIPTION, LAB_REQUEST_SLIP, RADIOLOGY_REQUEST_SLIP }
-enum class PlanTier { FREE, PRO }
+enum class DocumentType { USG_ABDOMEN, MEDICAL_LEAVE_CERT, MEDICAL_FITNESS_CERT }
 
 data class PatientDemographics(
     val patientId: String? = null,
@@ -19,43 +18,23 @@ data class PatientDemographics(
 
 sealed class DocumentPayload {
     data class UsgAbdomenPayload(val reportInput: ReportInput) : DocumentPayload()
-    data class MedicalCertificatePayload(
+    
+    data class LeaveCertificatePayload(
         val patient: PatientDemographics,
-        val type: String,
-        val diagnosis: String,
-        val fromDate: LocalDate,
-        val toDate: LocalDate,
+        val issueDateTime: LocalDateTime,
+        val diagnosisOrReason: String,
+        val startDate: LocalDate,
+        val endDate: LocalDate,
+        val durationDays: Int,
+        val notes: String = ""
+    ) : DocumentPayload()
+
+    data class FitnessCertificatePayload(
+        val patient: PatientDemographics,
+        val issueDateTime: LocalDateTime,
+        val purposeText: String,
+        val restrictionsText: String?,
         val remarks: String = ""
-    ) : DocumentPayload()
-
-    data class PrescriptionPayload(
-        val patient: PatientDemographics,
-        val diagnosis: String = "",
-        val medicines: List<MedicineRow>,
-        val advice: String = "",
-        val followUpDate: LocalDate? = null
-    ) : DocumentPayload() {
-        data class MedicineRow(
-            val drugName: String,
-            val dose: String,
-            val frequency: String,
-            val duration: String,
-            val instructions: String = ""
-        )
-    }
-
-    data class LabRequestPayload(
-        val patient: PatientDemographics,
-        val selectedLabs: List<String>,
-        val other: String = ""
-    ) : DocumentPayload()
-
-    data class RadiologyRequestPayload(
-        val patient: PatientDemographics,
-        val modality: String,
-        val studyName: String,
-        val clinicalNotes: String,
-        val urgent: Boolean
     ) : DocumentPayload()
 }
 

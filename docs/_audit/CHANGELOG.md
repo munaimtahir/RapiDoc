@@ -1,0 +1,10 @@
+# Changelog - Scope Reduction & Clinic Ready
+
+## Changes Made
+- **Removed Freemium/Pro Gating:** Deleted `PlanTier`, removed related data schemas from settings and system, and systematically stripped upsell logic from the Jetpack Compose UI routing logic.
+- **Removed Non-Essential Documents:** Removed `Prescription`, `Lab Request`, `Radiology Request` and `Medical Certificate`. Deprecated generic document features which compromised the integrity of fixed formatting.
+- **Added Target Document Models & Renderers:** Replaced generic layout implementations with concrete standalone implementations, specifically `LeaveCertificateRenderer` and `FitnessCertificateRenderer`, mapping fields from a precise deterministic model payload without variable structure logic. Form input screens were separated into distinct composables out of generic implementations.
+- **Implemented Rule-Based Chat Parser:** Built `ChatParser.kt` to securely and robustly parse quick-string input with deterministic Regex tokenizers and heuristics without generative dependencies. Supports quoting functionality for fields with whitespace (`dx="viral fever"`) alongside multi-word phrase matching algorithms, allowing inputs mapping directly to internal field constraints.
+- **Embedded UI for Parser Dictionary:** Added an interactive `ParserDictionaryScreen` utilizing SharedPreferences with Gson serialization. It lets the user view, search, map, append, delete, or reset custom local terms securely.
+- **Enabled Parse-to-Form User Workflows:** Wired parsing into a `Quick Entry` dialog embedded atop the home screen UI to natively auto-detect the DocumentType and on ambiguity, display an intuitive user prompt for manual selection to skip to prepopulated inputs.
+- **Test Validation:** Integrated JUnit to run a lightweight unit-test suite in `ParserTest.kt` verifying dictionary fallback mutations, Phrase matching constraints, tokenizing edge behaviors (space separation, explicit quotes, numeric extraction for days lengths) ensuring 100% build stability.

@@ -7,8 +7,7 @@ mkdir -p ~/Android/Sdk/cmdline-tools
 
 echo "Downloading OpenJDK 17..."
 if [ ! -d "$HOME/.jdk/jdk-17.0.2" ]; then
-    wget -q -O /tmp/openjdk-17.tar.gz https://download.java.net/java/GA/jdk17.0.2/dfd4a8d0985749f896bed50d7138ee7f/8/GPL/openjdk-17.0.2_linux-x64_bin.tar.gz
-    tar -xzf /tmp/openjdk-17.tar.gz -C ~/.jdk/
+DDDDDDDDDDDDDDDDDDD    tar -xzf /tmp/openjdk-17.tar.gz -C ~/.jdk/
     rm /tmp/openjdk-17.tar.gz
 fi
 

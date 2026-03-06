@@ -15,12 +15,7 @@ import java.io.IOException
 data class AppSettings(
     val headerText: String = "AlShifa PolyClinic",
     val logoPath: String? = null,
-    val planTier: PlanTier = PlanTier.FREE,
-    val includePhoneUsg: Boolean = false,
-    val includePhoneMedical: Boolean = false,
-    val includePhonePrescription: Boolean = false,
-    val includePhoneLab: Boolean = false,
-    val includePhoneRadiology: Boolean = false
+    val parserSynonymsJson: String = "{}"
 )
 
 class SettingsStore(private val context: Context) {
@@ -34,28 +29,18 @@ class SettingsStore(private val context: Context) {
             AppSettings(
                 headerText = prefs[KEY_HEADER] ?: "AlShifa PolyClinic",
                 logoPath = prefs[KEY_LOGO],
-                planTier = runCatching { PlanTier.valueOf(prefs[KEY_PLAN] ?: PlanTier.FREE.name) }.getOrDefault(PlanTier.FREE),
-                includePhoneUsg = prefs[KEY_PHONE_USG] ?: false,
-                includePhoneMedical = prefs[KEY_PHONE_MED] ?: false,
-                includePhonePrescription = prefs[KEY_PHONE_RX] ?: false,
-                includePhoneLab = prefs[KEY_PHONE_LAB] ?: false,
-                includePhoneRadiology = prefs[KEY_PHONE_RAD] ?: false
+                parserSynonymsJson = prefs[KEY_PARSER_SYNONYMS] ?: "{}"
             )
         }
 
     suspend fun updateHeader(text: String) = dataStore.edit { it[KEY_HEADER] = text }
     suspend fun updateLogo(path: String?) = dataStore.edit { if (path == null) it.remove(KEY_LOGO) else it[KEY_LOGO] = path }
-    suspend fun updatePlan(planTier: PlanTier) = dataStore.edit { it[KEY_PLAN] = planTier.name }
+    suspend fun updateParserSynonyms(json: String) = dataStore.edit { it[KEY_PARSER_SYNONYMS] = json }
     suspend fun resetFactory() = dataStore.edit { it.clear() }
 
     companion object {
         private val KEY_HEADER = stringPreferencesKey("header_text")
         private val KEY_LOGO = stringPreferencesKey("logo_path")
-        private val KEY_PLAN = stringPreferencesKey("plan_tier")
-        private val KEY_PHONE_USG = booleanPreferencesKey("include_phone_usg")
-        private val KEY_PHONE_MED = booleanPreferencesKey("include_phone_med")
-        private val KEY_PHONE_RX = booleanPreferencesKey("include_phone_rx")
-        private val KEY_PHONE_LAB = booleanPreferencesKey("include_phone_lab")
-        private val KEY_PHONE_RAD = booleanPreferencesKey("include_phone_rad")
+        private val KEY_PARSER_SYNONYMS = stringPreferencesKey("parser_synonyms")
     }
 }
