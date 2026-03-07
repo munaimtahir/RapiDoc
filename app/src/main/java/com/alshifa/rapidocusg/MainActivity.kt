@@ -778,7 +778,13 @@ private fun PreviewScreen(
     onNewReport: () -> Unit
 ) {
     var showError by remember { mutableStateOf(false) }
-    val isValid = reportInput.patient.name.trim().length >= 2 && reportInput.patient.ageYears.toIntOrNull() in 0..120 && reportInput.patient.sex != Sex.UNSET
+    val patientValid = reportInput.patient.name.trim().length >= 2 && reportInput.patient.ageYears.toIntOrNull() in 0..120 && reportInput.patient.sex != Sex.UNSET
+    
+    val f = reportInput.findings
+    val isLeftStoneValid = !f.stoneLeftPresent || (f.stoneLeftPresent && f.stoneLeftMm.toIntOrNull() != null && f.stoneLeftMm.toIntOrNull()!! > 0 && f.stoneLeftLocation != null)
+    val isRightStoneValid = !f.stoneRightPresent || (f.stoneRightPresent && f.stoneRightMm.toIntOrNull() != null && f.stoneRightMm.toIntOrNull()!! > 0 && f.stoneRightLocation != null)
+    val isValid = patientValid && isLeftStoneValid && isRightStoneValid
+
     Column(
         modifier = modifier
             .verticalScroll(rememberScrollState())
@@ -827,8 +833,12 @@ private fun PreviewScreen(
         }
 
         if (showError && !isValid) {
+            val errors = mutableListOf<String>()
+            if (!patientValid) errors.add("Patient details (Name, Age, Gender) must be valid.")
+            if (!isLeftStoneValid) errors.add("Left stone size and location are required.")
+            if (!isRightStoneValid) errors.add("Right stone size and location are required.")
             Text(
-                text = "Required fields (Name, Age, Gender) must be valid to generate.",
+                text = errors.joinToString("\n"),
                 color = MaterialTheme.colorScheme.error,
                 style = MaterialTheme.typography.bodyMedium
             )

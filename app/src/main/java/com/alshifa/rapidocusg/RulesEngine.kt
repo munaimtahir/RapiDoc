@@ -166,8 +166,8 @@ object RulesEngine {
 
             if (stonePresent) {
                 val st = stoneMm.toIntOrNull()
-                if (st != null && st > 0) {
-                    val locRepr = when (stoneLoc ?: StoneLocation.RENAL_PELVIS) {
+                if (st != null && st > 0 && stoneLoc != null) {
+                    val locRepr = when (stoneLoc) {
                         StoneLocation.UPPER_CALYX -> "upper calyx (upper pole)"
                         StoneLocation.MID_CALYX -> "mid calyx (mid pole)"
                         StoneLocation.LOWER_CALYX -> "lower calyx (lower pole)"
@@ -175,15 +175,6 @@ object RulesEngine {
                         StoneLocation.PUJ -> "pelvi-ureteric junction (PUJ/UPJ)"
                     }
                     findings += "A $st mm calculus is seen in the ${side.lowercase()} $locRepr."
-                } else {
-                    val locRepr = when (stoneLoc ?: StoneLocation.RENAL_PELVIS) {
-                        StoneLocation.UPPER_CALYX -> "upper calyx (upper pole)"
-                        StoneLocation.MID_CALYX -> "mid calyx (mid pole)"
-                        StoneLocation.LOWER_CALYX -> "lower calyx (lower pole)"
-                        StoneLocation.RENAL_PELVIS -> "renal pelvis"
-                        StoneLocation.PUJ -> "pelvi-ureteric junction (PUJ/UPJ)"
-                    }
-                    findings += "A calculus is seen in the ${side.lowercase()} $locRepr."
                 }
             }
 
@@ -256,15 +247,15 @@ object RulesEngine {
 
         val lkHydro = if (f.lkPrintMode == OrganPrintMode.ABNORMAL) f.hydronephrosisLeft else Hydronephrosis.NONE
         val rkHydro = if (f.rkPrintMode == OrganPrintMode.ABNORMAL) f.hydronephrosisRight else Hydronephrosis.NONE
-        val lkStone = if (f.lkPrintMode == OrganPrintMode.ABNORMAL && f.stoneLeftPresent) stoneLeft else null
-        val rkStone = if (f.rkPrintMode == OrganPrintMode.ABNORMAL && f.stoneRightPresent) stoneRight else null
-        val lkHasStone = f.lkPrintMode == OrganPrintMode.ABNORMAL && f.stoneLeftPresent
-        val rkHasStone = f.rkPrintMode == OrganPrintMode.ABNORMAL && f.stoneRightPresent
+        val lkStone = stoneLeft
+        val rkStone = stoneRight
+        val lkHasStone = f.lkPrintMode == OrganPrintMode.ABNORMAL && f.stoneLeftPresent && lkStone != null && lkStone > 0 && f.stoneLeftLocation != null
+        val rkHasStone = f.rkPrintMode == OrganPrintMode.ABNORMAL && f.stoneRightPresent && rkStone != null && rkStone > 0 && f.stoneRightLocation != null
 
         val bilateralSameSeverity = lkHydro != Hydronephrosis.NONE && lkHydro == rkHydro
 
-        fun stoneLocRepr(loc: StoneLocation?): String = 
-            when (loc ?: StoneLocation.RENAL_PELVIS) {
+        fun stoneLocRepr(loc: StoneLocation): String = 
+            when (loc) {
                 StoneLocation.UPPER_CALYX -> "upper calyx (upper pole)"
                 StoneLocation.MID_CALYX -> "mid calyx (mid pole)"
                 StoneLocation.LOWER_CALYX -> "lower calyx (lower pole)"
@@ -282,21 +273,17 @@ object RulesEngine {
 
         if (!bilateralSameSeverity) {
             if (lkHasStone && lkHydro == Hydronephrosis.NONE) {
-                if (lkStone != null && lkStone > 0) items += "Left renal calculus ($lkStone mm) in ${stoneLocRepr(f.stoneLeftLocation)}."
-                else items += "Left renal calculus in ${stoneLocRepr(f.stoneLeftLocation)}."
+                items += "Left renal calculus ($lkStone mm) in ${stoneLocRepr(f.stoneLeftLocation!!)}."
             }
             if (rkHasStone && rkHydro == Hydronephrosis.NONE) {
-                if (rkStone != null && rkStone > 0) items += "Right renal calculus ($rkStone mm) in ${stoneLocRepr(f.stoneRightLocation)}."
-                else items += "Right renal calculus in ${stoneLocRepr(f.stoneRightLocation)}."
+                items += "Right renal calculus ($rkStone mm) in ${stoneLocRepr(f.stoneRightLocation!!)}."
             }
         } else {
             if (lkHasStone) {
-                if (lkStone != null && lkStone > 0) items += "Left renal calculus ($lkStone mm) in ${stoneLocRepr(f.stoneLeftLocation)}."
-                else items += "Left renal calculus in ${stoneLocRepr(f.stoneLeftLocation)}."
+                items += "Left renal calculus ($lkStone mm) in ${stoneLocRepr(f.stoneLeftLocation!!)}."
             }
             if (rkHasStone) {
-                if (rkStone != null && rkStone > 0) items += "Right renal calculus ($rkStone mm) in ${stoneLocRepr(f.stoneRightLocation)}."
-                else items += "Right renal calculus in ${stoneLocRepr(f.stoneRightLocation)}."
+                items += "Right renal calculus ($rkStone mm) in ${stoneLocRepr(f.stoneRightLocation!!)}."
             }
         }
 
@@ -338,19 +325,15 @@ object RulesEngine {
         if (hydro == Hydronephrosis.NONE) return
 
         val sev = hydro.name.lowercase()
-        if (hasStone) {
-            val locRepr = when (stoneLoc ?: StoneLocation.RENAL_PELVIS) {
+        if (hasStone && stoneMm != null && stoneLoc != null) {
+            val locRepr = when (stoneLoc) {
                 StoneLocation.UPPER_CALYX -> "upper calyx (upper pole)"
                 StoneLocation.MID_CALYX -> "mid calyx (mid pole)"
                 StoneLocation.LOWER_CALYX -> "lower calyx (lower pole)"
                 StoneLocation.RENAL_PELVIS -> "renal pelvis"
                 StoneLocation.PUJ -> "pelvi-ureteric junction (PUJ/UPJ)"
             }
-            if (stoneMm != null && stoneMm > 0) {
-                items += "${sev.replaceFirstChar { it.titlecase() }} $side hydronephrosis with ${side.lowercase()} renal calculus ($stoneMm mm) in $locRepr."
-            } else {
-                items += "${sev.replaceFirstChar { it.titlecase() }} $side hydronephrosis with ${side.lowercase()} renal calculus in $locRepr."
-            }
+            items += "${sev.replaceFirstChar { it.titlecase() }} $side hydronephrosis with ${side.lowercase()} renal calculus ($stoneMm mm) in $locRepr."
         } else {
             items += "${sev.replaceFirstChar { it.titlecase() }} $side hydronephrosis."
         }

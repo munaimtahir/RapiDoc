@@ -7,8 +7,9 @@
 
 ## Changed
 * **RulesEngine Deterministic Generation**:
-  * Corrected calculus sentence string generation to cleanly handle variations in side, size, and location.
-  * Corrected the Impression block to cleanly output left/right combinations and preserve concise clinical statements.
+  * Tightened stone reporting rules: removed underspecified reporting. Left/Right stone now strictly requires size and location, bypassing fake/partial sentences.
+  * Corrected the Impression block to cleanly output left/right combinations, completely omitting stone mentions if incomplete.
+  * Validations added to block PDF Generation/Preview if requested stone data is incomplete.
 * **Organ Toggles**:
   * Organs set to `SKIP` will cleanly omit findings sections and avoid generating blank headers.
 * **Main Activity UI**:
