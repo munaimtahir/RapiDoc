@@ -159,39 +159,48 @@ private fun RapiDocApp() {
                             label = { Text("Command") }
                         )
                         Spacer(Modifier.width(8.dp))
-                        Button(onClick = {
-                            val mapType = object : com.google.gson.reflect.TypeToken<Map<String, String>>() {}.type
-                            val mappings: Map<String, String> = if (settings.parserSynonymsJson.isBlank() || settings.parserSynonymsJson == "{}") {
-                                emptyMap()
-                            } else {
-                                runCatching { gson.fromJson<Map<String, String>>(settings.parserSynonymsJson, mapType) }.getOrDefault(emptyMap())
+                        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                            if (rawQuickEntry.isNotEmpty()) {
+                                TextButton(onClick = { 
+                                    rawQuickEntry = ""
+                                    parseResult = null
+                                    initialFields = emptyMap()
+                                }) { Text("Clear") }
                             }
-                            val res = ChatParser.parse(rawQuickEntry, mappings)
-                            parseResult = res
-                            initialFields = res.filledFields
-                            if (res.confidence == ParseConfidence.LOW || res.confidence == ParseConfidence.NONE || res.detectedDocType == null) {
-                                showDocPicker = true
-                            } else {
-                                // Navigate mapped fields directly
-                                if (res.detectedDocType == DocumentType.USG_ABDOMEN) {
-                                    reportInput = reportInput.copy(
-                                        patient = reportInput.patient.copy(
-                                            name = (res.filledFields[SystemKeywords.KEY_NAME] as? String) ?: reportInput.patient.name,
-                                            ageYears = (res.filledFields[SystemKeywords.KEY_AGE] as? String) ?: reportInput.patient.ageYears,
-                                            sex = when ((res.filledFields[SystemKeywords.KEY_SEX] as? String)?.lowercase()) {
-                                                "male", "m" -> Sex.Male
-                                                "female", "f" -> Sex.Female
-                                                else -> reportInput.patient.sex
-                                            },
-                                        )
-                                    )
-                                    navController.navigate("doc/usg_abdomen/form")
+                            Button(onClick = {
+                                val mapType = object : com.google.gson.reflect.TypeToken<Map<String, String>>() {}.type
+                                val mappings: Map<String, String> = if (settings.parserSynonymsJson.isBlank() || settings.parserSynonymsJson == "{}") {
+                                    emptyMap()
                                 } else {
-                                    val route = DocumentRegistry.byType(res.detectedDocType).formRoute
-                                    navController.navigate(route)
+                                    runCatching { gson.fromJson<Map<String, String>>(settings.parserSynonymsJson, mapType) }.getOrDefault(emptyMap())
                                 }
-                            }
-                        }) { Text("Parse") }
+                                val res = ChatParser.parse(rawQuickEntry, mappings)
+                                parseResult = res
+                                initialFields = res.filledFields
+                                if (res.confidence == ParseConfidence.LOW || res.confidence == ParseConfidence.NONE || res.detectedDocType == null) {
+                                    showDocPicker = true
+                                } else {
+                                    // Navigate mapped fields directly
+                                    if (res.detectedDocType == DocumentType.USG_ABDOMEN) {
+                                        reportInput = reportInput.copy(
+                                            patient = reportInput.patient.copy(
+                                                name = (res.filledFields[SystemKeywords.KEY_NAME] as? String) ?: reportInput.patient.name,
+                                                ageYears = (res.filledFields[SystemKeywords.KEY_AGE] as? String) ?: reportInput.patient.ageYears,
+                                                sex = when ((res.filledFields[SystemKeywords.KEY_SEX] as? String)?.lowercase()) {
+                                                    "male", "m" -> Sex.Male
+                                                    "female", "f" -> Sex.Female
+                                                    else -> reportInput.patient.sex
+                                                },
+                                            )
+                                        )
+                                        navController.navigate("doc/usg_abdomen/form")
+                                    } else {
+                                        val route = DocumentRegistry.byType(res.detectedDocType).formRoute
+                                        navController.navigate(route)
+                                    }
+                                }
+                            }) { Text("Parse") }
+                    }
                     }
 
                     if (parseResult != null) {
@@ -401,26 +410,49 @@ private fun SettingsScreen(
     val context = LocalContext.current
     val isDebugBuild = (context.applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE) != 0
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri -> onUpdateLogo(uri) }
-    Column(Modifier.fillMaxSize().padding(16.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        Text("Settings", style = MaterialTheme.typography.headlineSmall)
-        OutlinedTextField(value = header, onValueChange = { header = it }, label = { Text("Header text") }, modifier = Modifier.fillMaxWidth())
-        Button(onClick = { onUpdateHeader(header) }) { Text("Save Header") }
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+    Column(Modifier.fillMaxSize().padding(16.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        Text("Settings", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+        
+        HorizontalDivider()
+        Text("Branding", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+        
+        OutlinedTextField(value = header, onValueChange = { header = it }, label = { Text("Header Text (e.g. Clinic Name)") }, modifier = Modifier.fillMaxWidth())
+        Button(onClick = { onUpdateHeader(header) }, modifier = Modifier.fillMaxWidth()) { Text("Save Header") }
+        
+        Spacer(Modifier.height(8.dp))
+        Text("Clinic Logo", style = MaterialTheme.typography.bodyMedium)
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
             Button(onClick = { picker.launch("image/*") }) { Text("Upload Logo") }
-            Button(onClick = { onUpdateLogo(null) }) { Text("Clear Logo") }
+            Button(onClick = { onUpdateLogo(null) }, colors = ButtonDefaults.buttonColors(containerColor = Color.Gray)) { Text("Clear Logo") }
         }
-        settings.logoPath?.let {
-            BitmapFactory.decodeFile(it)?.let { bmp -> Image(bitmap = bmp.asImageBitmap(), contentDescription = "logo", modifier = Modifier.size(100.dp)) }
-        }
-        Button(onClick = { showReset = true }, colors = ButtonDefaults.buttonColors(containerColor = Color.Red)) { Text("Factory Reset") }
-        if (showReset) {
-            Text("Confirm reset?")
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(onClick = { onReset(); showReset = false }) { Text("Yes") }
-                Button(onClick = { showReset = false }) { Text("No") }
+        
+        settings.logoPath?.let { path ->
+            BitmapFactory.decodeFile(path)?.let { bmp -> 
+                Image(bitmap = bmp.asImageBitmap(), contentDescription = "Current custom logo", modifier = Modifier.size(120.dp).padding(top = 8.dp)) 
             }
         }
-        TextButton(onClick = onBack) { Text("Back") }
+        
+        HorizontalDivider(modifier = Modifier.padding(top = 16.dp))
+        Text("Danger Zone", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = Color.Red)
+        
+        Button(onClick = { showReset = true }, colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFC62828)), modifier = Modifier.fillMaxWidth()) { Text("Factory Reset All Data") }
+        
+        if (showReset) {
+            AlertDialog(
+                onDismissRequest = { showReset = false },
+                title = { Text("Factory Reset") },
+                text = { Text("This will permanently clear all saved settings, patient forms, and configurations. Are you sure you want to proceed?") },
+                confirmButton = {
+                    TextButton(onClick = { onReset(); showReset = false }) { Text("Yes, Reset", color = Color.Red) }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showReset = false }) { Text("Cancel") }
+                }
+            )
+        }
+        
+        Spacer(Modifier.weight(1f))
+        TextButton(onClick = onBack, modifier = Modifier.fillMaxWidth()) { Text("Back to Home") }
     }
 }
 
@@ -463,6 +495,10 @@ private fun QuickEntryScreen(
     ) {
         Text("Quick Entry", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
 
+        val isValidName = reportInput.patient.name.trim().length >= 2
+        val isValidAge = reportInput.patient.ageYears.toIntOrNull() in 0..120
+        val isValidSex = reportInput.patient.sex != Sex.UNSET
+        
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text("Normal Toggle (resets input)")
             Spacer(Modifier.width(8.dp))
@@ -472,16 +508,17 @@ private fun QuickEntryScreen(
         OutlinedTextField(
             value = reportInput.patient.name,
             onValueChange = {
-                onInputChange(reportInput.copy(patient = reportInput.patient.copy(name = it)))
+                onInputChange(reportInput.copy(patient = reportInput.patient.copy(name = it.trimStart())))
             },
             modifier = Modifier.fillMaxWidth(),
+            isError = !isValidName && reportInput.patient.name.isNotEmpty(),
             label = { Text("Patient Name*") }
         )
 
         OutlinedTextField(
             value = reportInput.patient.patientId,
             onValueChange = {
-                onInputChange(reportInput.copy(patient = reportInput.patient.copy(patientId = it)))
+                onInputChange(reportInput.copy(patient = reportInput.patient.copy(patientId = it.trim())))
             },
             modifier = Modifier.fillMaxWidth(),
             label = { Text("Patient ID (optional)") }
@@ -494,6 +531,7 @@ private fun QuickEntryScreen(
             },
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
             modifier = Modifier.fillMaxWidth(),
+            isError = !isValidAge && reportInput.patient.ageYears.isNotEmpty(),
             label = { Text("Age*") }
         )
 
@@ -569,13 +607,17 @@ private fun QuickEntryScreen(
                 onSelect = { onInputChange(reportInput.copy(findings = findings.copy(rkCmd = it))) })
             EnumSelector(label = "Hydronephrosis", options = Hydronephrosis.entries, selected = findings.hydronephrosisRight, enabled = true,
                 onSelect = { onInputChange(reportInput.copy(findings = findings.copy(hydronephrosisRight = it))) })
-            OutlinedTextField(value = findings.stoneRightMm, onValueChange = { 
-                val newSize = it.filter(Char::isDigit)
-                val newLoc = if (newSize.isEmpty() || (newSize.toIntOrNull() ?: 0) <= 0) null else findings.stoneRightLocation ?: StoneLocation.RENAL_PELVIS
-                onInputChange(reportInput.copy(findings = findings.copy(stoneRightMm = newSize, stoneRightLocation = newLoc)))
-            },
-                modifier = Modifier.fillMaxWidth(), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), label = { Text("Right Renal Stone (mm)") })
-            if (findings.stoneRightMm.isNotEmpty() && (findings.stoneRightMm.toIntOrNull() ?: 0) > 0) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("Right Renal Stone")
+                Spacer(Modifier.width(8.dp))
+                Switch(checked = findings.stoneRightPresent, onCheckedChange = { onInputChange(reportInput.copy(findings = findings.copy(stoneRightPresent = it))) })
+            }
+            if (findings.stoneRightPresent) {
+                OutlinedTextField(value = findings.stoneRightMm, onValueChange = { 
+                    val newSize = it.filter(Char::isDigit)
+                    onInputChange(reportInput.copy(findings = findings.copy(stoneRightMm = newSize)))
+                },
+                    modifier = Modifier.fillMaxWidth(), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), label = { Text("Stone Size (mm)*") })
                 EnumSelector(
                     label = "Right stone location",
                     options = StoneLocation.entries,
@@ -603,13 +645,17 @@ private fun QuickEntryScreen(
                 onSelect = { onInputChange(reportInput.copy(findings = findings.copy(lkCmd = it))) })
             EnumSelector(label = "Hydronephrosis", options = Hydronephrosis.entries, selected = findings.hydronephrosisLeft, enabled = true,
                 onSelect = { onInputChange(reportInput.copy(findings = findings.copy(hydronephrosisLeft = it))) })
-            OutlinedTextField(value = findings.stoneLeftMm, onValueChange = { 
-                val newSize = it.filter(Char::isDigit)
-                val newLoc = if (newSize.isEmpty() || (newSize.toIntOrNull() ?: 0) <= 0) null else findings.stoneLeftLocation ?: StoneLocation.RENAL_PELVIS
-                onInputChange(reportInput.copy(findings = findings.copy(stoneLeftMm = newSize, stoneLeftLocation = newLoc)))
-            },
-                modifier = Modifier.fillMaxWidth(), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), label = { Text("Left Renal Stone (mm)") })
-            if (findings.stoneLeftMm.isNotEmpty() && (findings.stoneLeftMm.toIntOrNull() ?: 0) > 0) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("Left Renal Stone")
+                Spacer(Modifier.width(8.dp))
+                Switch(checked = findings.stoneLeftPresent, onCheckedChange = { onInputChange(reportInput.copy(findings = findings.copy(stoneLeftPresent = it))) })
+            }
+            if (findings.stoneLeftPresent) {
+                OutlinedTextField(value = findings.stoneLeftMm, onValueChange = { 
+                    val newSize = it.filter(Char::isDigit)
+                    onInputChange(reportInput.copy(findings = findings.copy(stoneLeftMm = newSize)))
+                },
+                    modifier = Modifier.fillMaxWidth(), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), label = { Text("Stone Size (mm)*") })
                 EnumSelector(
                     label = "Left stone location",
                     options = StoneLocation.entries,
@@ -653,8 +699,31 @@ private fun QuickEntryScreen(
         }
 
         Spacer(Modifier.height(6.dp))
-        Button(onClick = onGoPreview, modifier = Modifier.fillMaxWidth()) {
-            Text("Go To Preview")
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Button(onClick = onGoPreview, modifier = Modifier.weight(1f)) {
+                Text("Go To Preview")
+            }
+            
+            var showResetDialog by remember { mutableStateOf(false) }
+            Button(onClick = { showResetDialog = true }) { Text("Reset") }
+
+            if (showResetDialog) {
+                AlertDialog(
+                    onDismissRequest = { showResetDialog = false },
+                    title = { Text("Reset Form") },
+                    text = { Text("Are you sure you want to clear all form data?") },
+                    confirmButton = {
+                        TextButton(onClick = {
+                            onInputChange(ReportInput(PatientInfo(), FindingsInput()))
+                            onForceNormal(false)
+                            showResetDialog = false
+                        }) { Text("Yes, Reset") }
+                    },
+                    dismissButton = {
+                        TextButton(onClick = { showResetDialog = false }) { Text("Cancel") }
+                    }
+                )
+            }
         }
     }
 }
@@ -697,7 +766,7 @@ private fun PreviewScreen(
     onNewReport: () -> Unit
 ) {
     var showError by remember { mutableStateOf(false) }
-    val isValid = reportInput.patient.name.isNotBlank() && reportInput.patient.ageYears.isNotBlank() && reportInput.patient.sex != Sex.UNSET
+    val isValid = reportInput.patient.name.trim().length >= 2 && reportInput.patient.ageYears.toIntOrNull() in 0..120 && reportInput.patient.sex != Sex.UNSET
     Column(
         modifier = modifier
             .verticalScroll(rememberScrollState())
@@ -706,8 +775,9 @@ private fun PreviewScreen(
     ) {
         Text("Preview", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
         Text("Patient: ${reportInput.patient.name}")
-        if (reportInput.patient.patientId.trim().isNotEmpty()) {
-            Text("Patient ID: ${reportInput.patient.patientId}")
+        val trimmedPatientId = reportInput.patient.patientId.trim()
+        if (trimmedPatientId.isNotEmpty()) {
+            Text("Patient ID: $trimmedPatientId")
         }
         Text("Age/Gender: ${reportInput.patient.ageYears} / ${reportInput.patient.sex.name}")
 
@@ -769,26 +839,26 @@ private fun PdfPreviewBox(file: File?) {
             return
         }
 
-        val bitmapState = produceState<Bitmap?>(initialValue = null, key1 = file.absolutePath) {
-            value = withContext(Dispatchers.IO) { renderPdfFirstPage(file) }
-        }
+    val bitmapState = produceState<Bitmap?>(initialValue = null, key1 = file.absolutePath) {
+        value = withContext(Dispatchers.IO) { renderPdfFirstPageImpl(file) }
+    }
 
-        val bitmap = bitmapState.value
-        if (bitmap == null) {
-            Text("Unable to render preview")
-        } else {
-            Image(
-                bitmap = bitmap.asImageBitmap(),
-                contentDescription = "PDF first page",
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(8.dp)
-            )
-        }
+    val bitmap = bitmapState.value
+    if (bitmap == null) {
+        Text("Unable to render preview")
+    } else {
+        Image(
+            bitmap = bitmap.asImageBitmap(),
+            contentDescription = "PDF first page",
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(8.dp)
+        )
+    }
     }
 }
 
-private fun renderPdfFirstPage(file: File): Bitmap? {
+private fun renderPdfFirstPageImpl(file: File): Bitmap? {
     return try {
         val descriptor = ParcelFileDescriptor.open(file, ParcelFileDescriptor.MODE_READ_ONLY)
         val renderer = PdfRenderer(descriptor)

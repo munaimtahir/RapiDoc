@@ -64,7 +64,8 @@ object ChatParser {
         val mappings = HashMap(defaultMappings)
         customMappings?.forEach { (k, v) -> mappings[k.lowercase()] = v }
         
-        val tokens = tokenize(input)
+        val normalizedInput = input.replace(Regex("\\s+"), " ").trim()
+        val tokens = tokenize(normalizedInput)
         
         val replacedTokens = mutableListOf<String>()
         val docTypesFound = mutableSetOf<DocumentType>()

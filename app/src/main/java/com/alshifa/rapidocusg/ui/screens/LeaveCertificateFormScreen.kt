@@ -15,7 +15,6 @@ import androidx.compose.ui.unit.dp
 import com.alshifa.rapidocusg.core.documentengine.*
 import com.alshifa.rapidocusg.core.parser.SystemKeywords
 import java.time.LocalDate
-import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import java.time.format.DateTimeParseException
 
@@ -49,17 +48,45 @@ fun LeaveCertificateFormScreen(
         startDate.plusDays((durationDays - 1).toLong())
     } else null
 
-    val isValid = name.isNotBlank() && age.isNotBlank() && (gender.equals("Male", true) || gender.equals("Female", true) || gender.equals("m", true) || gender.equals("f", true)) &&
+    val isValidName = name.trim().length >= 2
+    val isValidAge = age.toIntOrNull() in 0..120
+    val isValidSex = gender.equals("Male", true) || gender.equals("Female", true) || gender.equals("m", true) || gender.equals("f", true)
+    
+    val isValid = isValidName && isValidAge && isValidSex &&
             diagnosisOrReason.isNotBlank() && startDate != null && durationDays != null && durationDays in 1..30 &&
             diagnosisOrReason.length <= 120 && notes.length <= 120
 
     Column(Modifier.fillMaxSize().padding(16.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text("Medical Leave Certificate", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
         
-        OutlinedTextField(name, { name = it }, label = { Text("Patient Name*") }, modifier = Modifier.fillMaxWidth())
-        OutlinedTextField(age, { age = it.filter(Char::isDigit) }, label = { Text("Age (Years)*") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.fillMaxWidth())
-        OutlinedTextField(gender, { gender = it }, label = { Text("Gender (Male/Female)*") }, modifier = Modifier.fillMaxWidth())
-        OutlinedTextField(patientId, { patientId = it }, label = { Text("Patient ID (Optional)") }, modifier = Modifier.fillMaxWidth())
+        OutlinedTextField(
+            value = name,
+            onValueChange = { name = it.trimStart() },
+            isError = !isValidName && name.isNotEmpty(),
+            label = { Text("Patient Name*") },
+            modifier = Modifier.fillMaxWidth()
+        )
+        OutlinedTextField(
+            value = age,
+            onValueChange = { age = it.filter(Char::isDigit) },
+            isError = !isValidAge && age.isNotEmpty(),
+            label = { Text("Age (Years)*") },
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+            modifier = Modifier.fillMaxWidth()
+        )
+        OutlinedTextField(
+            value = gender,
+            onValueChange = { gender = it.trim() },
+            isError = !isValidSex && gender.isNotEmpty(),
+            label = { Text("Gender (Male/Female)*") },
+            modifier = Modifier.fillMaxWidth()
+        )
+        OutlinedTextField(
+            value = patientId,
+            onValueChange = { patientId = it.trim() },
+            label = { Text("Patient ID (Optional)") },
+            modifier = Modifier.fillMaxWidth()
+        )
         
         Spacer(Modifier.height(8.dp))
         Text("Leave Details", fontWeight = FontWeight.SemiBold)
@@ -104,9 +131,25 @@ fun LeaveCertificateFormScreen(
                 onGenerated(rendered, DocumentType.MEDICAL_LEAVE_CERT)
             }, enabled = isValid) { Text("Generate PDF") }
             
-            Button(onClick = {
-                name = ""; age = ""; gender = ""; patientId = ""; diagnosisOrReason = ""; durationDaysStr = "3"; startDateStr = LocalDate.now().format(DateTimeFormatter.ISO_LOCAL_DATE); notes = ""
-            }) { Text("Reset") }
+            var showResetDialog by remember { mutableStateOf(false) }
+            Button(onClick = { showResetDialog = true }) { Text("Reset") }
+
+            if (showResetDialog) {
+                AlertDialog(
+                    onDismissRequest = { showResetDialog = false },
+                    title = { Text("Reset Form") },
+                    text = { Text("Are you sure you want to clear all form data?") },
+                    confirmButton = {
+                        TextButton(onClick = {
+                            name = ""; age = ""; gender = ""; patientId = ""; diagnosisOrReason = ""; durationDaysStr = "3"; startDateStr = LocalDate.now().format(DateTimeFormatter.ISO_LOCAL_DATE); notes = ""
+                            showResetDialog = false
+                        }) { Text("Yes, Reset") }
+                    },
+                    dismissButton = {
+                        TextButton(onClick = { showResetDialog = false }) { Text("Cancel") }
+                    }
+                )
+            }
         }
         TextButton(onClick = onBack) { Text("Back") }
     }

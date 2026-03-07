@@ -11,13 +11,15 @@ import java.io.File
 import java.io.FileOutputStream
 import java.time.format.DateTimeFormatter
 import java.util.Locale
+import com.alshifa.rapidocusg.core.documentengine.BrandingConfig
+import android.graphics.RectF
 
 object PdfGenerator {
 
     private val displayDateTime = DateTimeFormatter.ofPattern("dd MMM yyyy, hh:mm a", Locale.US)
     private val fileDateTime = DateTimeFormatter.ofPattern("yyyyMMdd_HHmm", Locale.US)
 
-    fun generatePdf(context: Context, input: ReportInput, body: ReportBody): File {
+    fun generatePdf(context: Context, input: ReportInput, body: ReportBody, branding: BrandingConfig): File {
         val doc = PdfDocument()
         val pageInfo = PdfDocument.PageInfo.Builder(595, 842, 1).create() // A4 at 72dpi
         val page = doc.startPage(pageInfo)
@@ -31,7 +33,7 @@ object PdfGenerator {
 
         var y = 40f
 
-        drawHeader(context, canvas, bold)
+        drawHeader(context, canvas, bold, branding)
         y = 90f
 
         val demoRows = buildList {
@@ -75,16 +77,19 @@ object PdfGenerator {
         return outFile
     }
 
-    private fun drawHeader(context: Context, canvas: Canvas, titlePaint: Paint) {
-        val logo = BitmapFactory.decodeResource(context.resources, R.drawable.polyclinic_logo)
-        if (logo != null) {
+    private fun drawHeader(context: Context, canvas: Canvas, titlePaint: Paint, branding: BrandingConfig) {
+        val logoBmp = branding.logoPathOrUri?.let { runCatching { BitmapFactory.decodeFile(it) }.getOrNull() }
+            ?: BitmapFactory.decodeResource(context.resources, R.drawable.polyclinic_logo)
+        
+        logoBmp?.let {
             val dstLeft = 40f
             val dstTop = 20f
             val dstRight = 120f
             val dstBottom = 70f
-            canvas.drawBitmap(logo, null, android.graphics.RectF(dstLeft, dstTop, dstRight, dstBottom), null)
+            canvas.drawBitmap(it, null, RectF(dstLeft, dstTop, dstRight, dstBottom), null)
         }
-        canvas.drawText("AlShifa PolyClinic", 135f, 45f, titlePaint)
+        
+        canvas.drawText(branding.headerText, 135f, 45f, titlePaint)
         canvas.drawText("Ultrasound Abdomen Report", 135f, 65f, titlePaint)
     }
 

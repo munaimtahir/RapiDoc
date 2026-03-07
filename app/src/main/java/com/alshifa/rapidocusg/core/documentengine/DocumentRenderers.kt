@@ -28,7 +28,7 @@ object UsgRenderer : DocumentRenderer<DocumentPayload.UsgAbdomenPayload> {
                 reportingDateTime = timing.reporting
             )
         )
-        val file = PdfGenerator.generatePdf(context, inputForPdf, RulesEngine.buildReport(inputForPdf))
+        val file = PdfGenerator.generatePdf(context, inputForPdf, RulesEngine.buildReport(inputForPdf), branding)
         return RenderedDocument(file, "USG Abdomen")
     }
 }
@@ -119,10 +119,11 @@ object LeaveCertificateRenderer : DocumentRenderer<DocumentPayload.LeaveCertific
         val endStr = payload.endDate.format(dtFormatter)
         
         lines += "This is to certify that Mr/Ms ${payload.patient.name}, aged ${payload.patient.age} years, was examined and is advised rest for ${payload.durationDays} day(s) from $startStr to $endStr due to ${payload.diagnosisOrReason}."
+        lines += ""
         if (payload.notes.isNotBlank()) {
             lines += "Notes: ${payload.notes}"
+            lines += ""
         }
-        lines += ""
         lines += "This certificate is issued based on clinical examination. Verification may be required where applicable."
         
         val file = SimpleDocPdf.render(context, "Medical Leave Certificate", branding, timing, payload.patient, lines)
@@ -142,13 +143,15 @@ object FitnessCertificateRenderer : DocumentRenderer<DocumentPayload.FitnessCert
         val lines = mutableListOf<String>()
         
         lines += "This is to certify that Mr/Ms ${payload.patient.name}, aged ${payload.patient.age} years, was examined and is found medically fit for ${payload.purposeText}."
+        lines += ""
         if (!payload.restrictionsText.isNullOrBlank()) {
             lines += "Restrictions: ${payload.restrictionsText}"
+            lines += ""
         }
         if (payload.remarks.isNotBlank()) {
             lines += "Remarks: ${payload.remarks}"
+            lines += ""
         }
-        lines += ""
         lines += "This certificate is issued based on clinical examination. Verification may be required where applicable."
         
         val file = SimpleDocPdf.render(context, "Medical Fitness Certificate", branding, timing, payload.patient, lines)

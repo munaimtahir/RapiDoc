@@ -50,7 +50,11 @@ fun FitnessCertificateFormScreen(
     val resolvedPurpose = if (selectedPurpose == "OTHER") otherPurposeText else selectedPurpose.replace("_", " ").lowercase()
     val resolvedRestriction = if (selectedRestriction == "OTHER") otherRestrictionsText else selectedRestriction.replace("_", " ").lowercase()
 
-    val isValid = name.isNotBlank() && age.isNotBlank() && (gender.equals("Male", true) || gender.equals("Female", true) || gender.equals("m", true) || gender.equals("f", true)) &&
+    val isValidName = name.trim().length >= 2
+    val isValidAge = age.toIntOrNull() in 0..120
+    val isValidSex = gender.equals("Male", true) || gender.equals("Female", true) || gender.equals("m", true) || gender.equals("f", true)
+
+    val isValid = isValidName && isValidAge && isValidSex &&
             (selectedPurpose != "OTHER" || otherPurposeText.isNotBlank()) &&
             (selectedRestriction != "OTHER" || otherRestrictionsText.isNotBlank()) &&
             remarks.length <= 120 && otherPurposeText.length <= 60 && otherRestrictionsText.length <= 60
@@ -58,10 +62,34 @@ fun FitnessCertificateFormScreen(
     Column(Modifier.fillMaxSize().padding(16.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text("Medical Fitness Certificate", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
         
-        OutlinedTextField(name, { name = it }, label = { Text("Patient Name*") }, modifier = Modifier.fillMaxWidth())
-        OutlinedTextField(age, { age = it.filter(Char::isDigit) }, label = { Text("Age (Years)*") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.fillMaxWidth())
-        OutlinedTextField(gender, { gender = it }, label = { Text("Gender (Male/Female)*") }, modifier = Modifier.fillMaxWidth())
-        OutlinedTextField(patientId, { patientId = it }, label = { Text("Patient ID (Optional)") }, modifier = Modifier.fillMaxWidth())
+        OutlinedTextField(
+            value = name,
+            onValueChange = { name = it.trimStart() },
+            isError = !isValidName && name.isNotEmpty(),
+            label = { Text("Patient Name*") },
+            modifier = Modifier.fillMaxWidth()
+        )
+        OutlinedTextField(
+            value = age,
+            onValueChange = { age = it.filter(Char::isDigit) },
+            isError = !isValidAge && age.isNotEmpty(),
+            label = { Text("Age (Years)*") },
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+            modifier = Modifier.fillMaxWidth()
+        )
+        OutlinedTextField(
+            value = gender,
+            onValueChange = { gender = it.trim() },
+            isError = !isValidSex && gender.isNotEmpty(),
+            label = { Text("Gender (Male/Female)*") },
+            modifier = Modifier.fillMaxWidth()
+        )
+        OutlinedTextField(
+            value = patientId,
+            onValueChange = { patientId = it.trim() },
+            label = { Text("Patient ID (Optional)") },
+            modifier = Modifier.fillMaxWidth()
+        )
         
         Spacer(Modifier.height(8.dp))
         Text("Fitness Details", fontWeight = FontWeight.SemiBold)
@@ -117,9 +145,25 @@ fun FitnessCertificateFormScreen(
                 onGenerated(rendered, DocumentType.MEDICAL_FITNESS_CERT)
             }, enabled = isValid) { Text("Generate PDF") }
             
-            Button(onClick = {
-                name = ""; age = ""; gender = ""; patientId = ""; selectedPurpose = purposes[0]; otherPurposeText = ""; selectedRestriction = restrictions[0]; otherRestrictionsText = ""; remarks = ""
-            }) { Text("Reset") }
+            var showResetDialog by remember { mutableStateOf(false) }
+            Button(onClick = { showResetDialog = true }) { Text("Reset") }
+
+            if (showResetDialog) {
+                AlertDialog(
+                    onDismissRequest = { showResetDialog = false },
+                    title = { Text("Reset Form") },
+                    text = { Text("Are you sure you want to clear all form data?") },
+                    confirmButton = {
+                        TextButton(onClick = {
+                            name = ""; age = ""; gender = ""; patientId = ""; selectedPurpose = purposes[0]; otherPurposeText = ""; selectedRestriction = restrictions[0]; otherRestrictionsText = ""; remarks = ""
+                            showResetDialog = false
+                        }) { Text("Yes, Reset") }
+                    },
+                    dismissButton = {
+                        TextButton(onClick = { showResetDialog = false }) { Text("Cancel") }
+                    }
+                )
+            }
         }
         TextButton(onClick = onBack) { Text("Back") }
     }

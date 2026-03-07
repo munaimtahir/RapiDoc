@@ -80,6 +80,7 @@ object RulesEngine {
             mode = f.rkPrintMode,
             cmdState = f.rkCmd,
             hydronephrosis = f.hydronephrosisRight,
+            stonePresent = f.stoneRightPresent,
             stoneMm = f.stoneRightMm,
             stoneLoc = f.stoneRightLocation,
             renalCyst = f.renalCystRight,
@@ -93,6 +94,7 @@ object RulesEngine {
             mode = f.lkPrintMode,
             cmdState = f.lkCmd,
             hydronephrosis = f.hydronephrosisLeft,
+            stonePresent = f.stoneLeftPresent,
             stoneMm = f.stoneLeftMm,
             stoneLoc = f.stoneLeftLocation,
             renalCyst = f.renalCystLeft,
@@ -131,6 +133,7 @@ object RulesEngine {
         mode: OrganPrintMode,
         cmdState: CmdState,
         hydronephrosis: Hydronephrosis,
+        stonePresent: Boolean,
         stoneMm: String,
         stoneLoc: StoneLocation?,
         renalCyst: Boolean,
@@ -161,16 +164,27 @@ object RulesEngine {
                 findings += "$side kidney shows $sev pelvicalyceal dilatation consistent with $sev hydronephrosis."
             }
 
-            val st = stoneMm.toIntOrNull()
-            if (st != null && st > 0) {
-                val locRepr = when (stoneLoc ?: StoneLocation.RENAL_PELVIS) {
-                    StoneLocation.UPPER_CALYX -> "upper calyx (upper pole)"
-                    StoneLocation.MID_CALYX -> "mid calyx (mid pole)"
-                    StoneLocation.LOWER_CALYX -> "lower calyx (lower pole)"
-                    StoneLocation.RENAL_PELVIS -> "renal pelvis"
-                    StoneLocation.PUJ -> "pelvi-ureteric junction (PUJ/UPJ)"
+            if (stonePresent) {
+                val st = stoneMm.toIntOrNull()
+                if (st != null && st > 0) {
+                    val locRepr = when (stoneLoc ?: StoneLocation.RENAL_PELVIS) {
+                        StoneLocation.UPPER_CALYX -> "upper calyx (upper pole)"
+                        StoneLocation.MID_CALYX -> "mid calyx (mid pole)"
+                        StoneLocation.LOWER_CALYX -> "lower calyx (lower pole)"
+                        StoneLocation.RENAL_PELVIS -> "renal pelvis"
+                        StoneLocation.PUJ -> "pelvi-ureteric junction (PUJ/UPJ)"
+                    }
+                    findings += "A $st mm calculus is seen in the ${side.lowercase()} $locRepr."
+                } else {
+                    val locRepr = when (stoneLoc ?: StoneLocation.RENAL_PELVIS) {
+                        StoneLocation.UPPER_CALYX -> "upper calyx (upper pole)"
+                        StoneLocation.MID_CALYX -> "mid calyx (mid pole)"
+                        StoneLocation.LOWER_CALYX -> "lower calyx (lower pole)"
+                        StoneLocation.RENAL_PELVIS -> "renal pelvis"
+                        StoneLocation.PUJ -> "pelvi-ureteric junction (PUJ/UPJ)"
+                    }
+                    findings += "A calculus is seen in the ${side.lowercase()} $locRepr."
                 }
-                findings += "A $st mm calculus is seen in the ${side.lowercase()} $locRepr."
             }
 
             if (renalCyst) {
@@ -242,8 +256,10 @@ object RulesEngine {
 
         val lkHydro = if (f.lkPrintMode == OrganPrintMode.ABNORMAL) f.hydronephrosisLeft else Hydronephrosis.NONE
         val rkHydro = if (f.rkPrintMode == OrganPrintMode.ABNORMAL) f.hydronephrosisRight else Hydronephrosis.NONE
-        val lkStone = if (f.lkPrintMode == OrganPrintMode.ABNORMAL) stoneLeft else null
-        val rkStone = if (f.rkPrintMode == OrganPrintMode.ABNORMAL) stoneRight else null
+        val lkStone = if (f.lkPrintMode == OrganPrintMode.ABNORMAL && f.stoneLeftPresent) stoneLeft else null
+        val rkStone = if (f.rkPrintMode == OrganPrintMode.ABNORMAL && f.stoneRightPresent) stoneRight else null
+        val lkHasStone = f.lkPrintMode == OrganPrintMode.ABNORMAL && f.stoneLeftPresent
+        val rkHasStone = f.rkPrintMode == OrganPrintMode.ABNORMAL && f.stoneRightPresent
 
         val bilateralSameSeverity = lkHydro != Hydronephrosis.NONE && lkHydro == rkHydro
 
@@ -260,23 +276,27 @@ object RulesEngine {
             val sev = lkHydro.name.lowercase().replaceFirstChar { it.titlecase() }
             items += "$sev bilateral hydronephrosis."
         } else {
-            appendSideHydroWithStone(side = "left", hydro = lkHydro, stoneMm = lkStone, stoneLoc = f.stoneLeftLocation, items = items)
-            appendSideHydroWithStone(side = "right", hydro = rkHydro, stoneMm = rkStone, stoneLoc = f.stoneRightLocation, items = items)
+            appendSideHydroWithStone(side = "left", hydro = lkHydro, hasStone = lkHasStone, stoneMm = lkStone, stoneLoc = f.stoneLeftLocation, items = items)
+            appendSideHydroWithStone(side = "right", hydro = rkHydro, hasStone = rkHasStone, stoneMm = rkStone, stoneLoc = f.stoneRightLocation, items = items)
         }
 
         if (!bilateralSameSeverity) {
-            if (lkStone != null && lkStone > 0 && lkHydro == Hydronephrosis.NONE) {
-                items += "Left renal calculus ($lkStone mm) in ${stoneLocRepr(f.stoneLeftLocation)}."
+            if (lkHasStone && lkHydro == Hydronephrosis.NONE) {
+                if (lkStone != null && lkStone > 0) items += "Left renal calculus ($lkStone mm) in ${stoneLocRepr(f.stoneLeftLocation)}."
+                else items += "Left renal calculus in ${stoneLocRepr(f.stoneLeftLocation)}."
             }
-            if (rkStone != null && rkStone > 0 && rkHydro == Hydronephrosis.NONE) {
-                items += "Right renal calculus ($rkStone mm) in ${stoneLocRepr(f.stoneRightLocation)}."
+            if (rkHasStone && rkHydro == Hydronephrosis.NONE) {
+                if (rkStone != null && rkStone > 0) items += "Right renal calculus ($rkStone mm) in ${stoneLocRepr(f.stoneRightLocation)}."
+                else items += "Right renal calculus in ${stoneLocRepr(f.stoneRightLocation)}."
             }
         } else {
-            if (lkStone != null && lkStone > 0) {
-                items += "Left renal calculus ($lkStone mm) in ${stoneLocRepr(f.stoneLeftLocation)}."
+            if (lkHasStone) {
+                if (lkStone != null && lkStone > 0) items += "Left renal calculus ($lkStone mm) in ${stoneLocRepr(f.stoneLeftLocation)}."
+                else items += "Left renal calculus in ${stoneLocRepr(f.stoneLeftLocation)}."
             }
-            if (rkStone != null && rkStone > 0) {
-                items += "Right renal calculus ($rkStone mm) in ${stoneLocRepr(f.stoneRightLocation)}."
+            if (rkHasStone) {
+                if (rkStone != null && rkStone > 0) items += "Right renal calculus ($rkStone mm) in ${stoneLocRepr(f.stoneRightLocation)}."
+                else items += "Right renal calculus in ${stoneLocRepr(f.stoneRightLocation)}."
             }
         }
 
@@ -310,6 +330,7 @@ object RulesEngine {
     private fun appendSideHydroWithStone(
         side: String,
         hydro: Hydronephrosis,
+        hasStone: Boolean,
         stoneMm: Int?,
         stoneLoc: StoneLocation?,
         items: MutableList<String>
@@ -317,7 +338,7 @@ object RulesEngine {
         if (hydro == Hydronephrosis.NONE) return
 
         val sev = hydro.name.lowercase()
-        if (stoneMm != null && stoneMm > 0) {
+        if (hasStone) {
             val locRepr = when (stoneLoc ?: StoneLocation.RENAL_PELVIS) {
                 StoneLocation.UPPER_CALYX -> "upper calyx (upper pole)"
                 StoneLocation.MID_CALYX -> "mid calyx (mid pole)"
@@ -325,7 +346,11 @@ object RulesEngine {
                 StoneLocation.RENAL_PELVIS -> "renal pelvis"
                 StoneLocation.PUJ -> "pelvi-ureteric junction (PUJ/UPJ)"
             }
-            items += "${sev.replaceFirstChar { it.titlecase() }} $side hydronephrosis with ${side.lowercase()} renal calculus ($stoneMm mm) in $locRepr."
+            if (stoneMm != null && stoneMm > 0) {
+                items += "${sev.replaceFirstChar { it.titlecase() }} $side hydronephrosis with ${side.lowercase()} renal calculus ($stoneMm mm) in $locRepr."
+            } else {
+                items += "${sev.replaceFirstChar { it.titlecase() }} $side hydronephrosis with ${side.lowercase()} renal calculus in $locRepr."
+            }
         } else {
             items += "${sev.replaceFirstChar { it.titlecase() }} $side hydronephrosis."
         }
