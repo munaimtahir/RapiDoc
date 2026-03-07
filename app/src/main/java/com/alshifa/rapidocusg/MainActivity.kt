@@ -59,9 +59,15 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.navigation.NavType
@@ -69,6 +75,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import com.alshifa.rapidocusg.core.documentengine.AppearanceMode
 import com.alshifa.rapidocusg.core.documentengine.AppSettings
 import com.alshifa.rapidocusg.core.documentengine.BrandingConfig
 import com.alshifa.rapidocusg.core.documentengine.DocumentPayload
@@ -100,9 +107,12 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
-            MaterialTheme {
-                Surface {
-                    RapiDocApp()
+            val context = LocalContext.current
+            val settingsStore = remember { SettingsStore(context) }
+            val settings by settingsStore.settings.collectAsState(initial = AppSettings())
+            com.alshifa.rapidocusg.ui.theme.RapiDocTheme(settings = settings) {
+                Surface(color = MaterialTheme.colorScheme.background) {
+                    RapiDocApp(settingsStore = settingsStore, settings = settings)
                 }
             }
         }
@@ -110,11 +120,9 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-private fun RapiDocApp() {
+private fun RapiDocApp(settingsStore: SettingsStore, settings: AppSettings) {
     val context = LocalContext.current
     val navController = rememberNavController()
-    val settingsStore = remember { SettingsStore(context) }
-    val settings by settingsStore.settings.collectAsState(initial = AppSettings())
     val scope = rememberCoroutineScope()
     val prefs = remember { context.getSharedPreferences("RapiDocPrefs", Context.MODE_PRIVATE) }
     val gson = remember { Gson() }
@@ -208,13 +216,13 @@ private fun RapiDocApp() {
                     }
 
                     if (parseResult != null) {
-                        Column(modifier = Modifier.fillMaxWidth().background(Color(0xFFE3F2FD)).padding(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                            Text("Parsed Summary", fontWeight = FontWeight.Bold)
+                        Column(modifier = Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.secondaryContainer).padding(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            Text("Parsed Summary", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSecondaryContainer)
                             val res = parseResult!!
-                            Text("Detected: ${res.detectedDocType?.name ?: "Unknown"} [${res.confidence.name}]", color = if (res.confidence == ParseConfidence.HIGH) Color(0xFF2E7D32) else Color(0xFFC62828))
-                            Text("Filled: ${res.filledFields}")
-                            if (res.missingRequired.isNotEmpty()) Text("Missing: ${res.missingRequired}", color = Color.Red)
-                            if (res.unknownTokens.isNotEmpty()) Text("Unknown: ${res.unknownTokens}", color = Color(0xFFE65100))
+                            Text("Detected: ${res.detectedDocType?.name ?: "Unknown"} [${res.confidence.name}]", color = if (res.confidence == ParseConfidence.HIGH) com.alshifa.rapidocusg.ui.theme.StatusNormal else com.alshifa.rapidocusg.ui.theme.StatusAbnormal)
+                            Text("Filled: ${res.filledFields}", color = MaterialTheme.colorScheme.onSecondaryContainer)
+                            if (res.missingRequired.isNotEmpty()) Text("Missing: ${res.missingRequired}", color = com.alshifa.rapidocusg.ui.theme.StatusAbnormal)
+                            if (res.unknownTokens.isNotEmpty()) Text("Unknown: ${res.unknownTokens}", color = MaterialTheme.colorScheme.error)
                         }
                     }
 
@@ -274,7 +282,11 @@ private fun RapiDocApp() {
             )
         }
         composable("settings") {
-            SettingsScreen(settings = settings, onBack = { navController.popBackStack() }, onUpdateHeader = {
+            SettingsScreen(
+                settings = settings,
+                onBack = { navController.popBackStack() },
+                onUpdateAppearanceMode = { scope.launch { settingsStore.updateAppearanceMode(it) } },
+                onUpdateHeader = {
                 scope.launch { settingsStore.updateHeader(it) }
             }, onUpdateLogo = { uri ->
                 scope.launch {
@@ -300,10 +312,12 @@ private fun RapiDocApp() {
                 modifier = Modifier.fillMaxSize(),
                 reportInput = reportInput,
                 forceNormal = forceNormal,
+                settings = settings,
                 onInputChange = { reportInput = it; forceNormal = false },
                 onForceNormal = { enabled -> forceNormal = enabled; if (enabled) reportInput = reportInput.copy(findings = FindingsInput()) },
                 onLoadNormal = { reportInput = reportInput.copy(findings = FindingsInput()); forceNormal = false },
                 onGoPreview = { navController.navigate("doc/usg_abdomen/preview") },
+                onSettings = { navController.navigate("settings") },
                 onBack = { navController.popBackStack() }
             )
         }
@@ -402,10 +416,12 @@ private fun docTypeFromRouteArg(docTypeArg: String): DocumentType? = when (docTy
     else -> null
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun SettingsScreen(
     settings: AppSettings,
     onBack: () -> Unit,
+    onUpdateAppearanceMode: (AppearanceMode) -> Unit,
     onUpdateHeader: (String) -> Unit,
     onUpdateLogo: (Uri?) -> Unit,
     onReset: () -> Unit
@@ -431,7 +447,7 @@ private fun SettingsScreen(
         Text("Clinic Logo", style = MaterialTheme.typography.bodyMedium)
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
             Button(onClick = { picker.launch("image/*") }) { Text("Upload Logo") }
-            Button(onClick = { onUpdateLogo(null) }, colors = ButtonDefaults.buttonColors(containerColor = Color.Gray)) { Text("Clear Logo") }
+            Button(onClick = { onUpdateLogo(null) }, colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.surfaceVariant, contentColor = MaterialTheme.colorScheme.onSurfaceVariant)) { Text("Clear Logo") }
         }
         
         settings.logoPath?.let { path ->
@@ -441,9 +457,20 @@ private fun SettingsScreen(
         }
         
         HorizontalDivider(modifier = Modifier.padding(top = 16.dp))
-        Text("Danger Zone", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = Color.Red)
+        Text("Appearance", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+        EnumSelector(
+            label = "Theme",
+            options = AppearanceMode.entries,
+            selected = settings.appearanceMode,
+            enabled = true,
+            itemLabel = { it.name.lowercase().replaceFirstChar { char -> char.uppercase() } },
+            onSelect = onUpdateAppearanceMode
+        )
+
+        HorizontalDivider(modifier = Modifier.padding(top = 16.dp))
+        Text("Danger Zone", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.error)
         
-        Button(onClick = { showReset = true }, colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFC62828)), modifier = Modifier.fillMaxWidth()) { Text("Factory Reset All Data") }
+        Button(onClick = { showReset = true }, colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.errorContainer, contentColor = MaterialTheme.colorScheme.onErrorContainer), modifier = Modifier.fillMaxWidth()) { Text("Factory Reset All Data") }
         
         if (showReset) {
             AlertDialog(
@@ -451,7 +478,7 @@ private fun SettingsScreen(
                 title = { Text("Factory Reset") },
                 text = { Text("This will permanently clear all saved settings, patient forms, and configurations. Are you sure you want to proceed?") },
                 confirmButton = {
-                    TextButton(onClick = { onReset(); showReset = false }) { Text("Yes, Reset", color = Color.Red) }
+                    TextButton(onClick = { onReset(); showReset = false }) { Text("Yes, Reset", color = MaterialTheme.colorScheme.error) }
                 },
                 dismissButton = {
                     TextButton(onClick = { showReset = false }) { Text("Cancel") }
@@ -485,10 +512,12 @@ private fun QuickEntryScreen(
     modifier: Modifier,
     reportInput: ReportInput,
     forceNormal: Boolean,
+    settings: AppSettings,
     onInputChange: (ReportInput) -> Unit,
     onForceNormal: (Boolean) -> Unit,
     onLoadNormal: () -> Unit,
     onGoPreview: () -> Unit,
+    onSettings: () -> Unit,
     onBack: () -> Unit
 ) {
     val findings = reportInput.findings
@@ -501,59 +530,83 @@ private fun QuickEntryScreen(
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            IconButton(onClick = onBack) {
-                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                IconButton(onClick = onBack) {
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                }
+                settings.logoPath?.let { path ->
+                    BitmapFactory.decodeFile(path)?.let { bmp ->
+                        Image(bitmap = bmp.asImageBitmap(), contentDescription = "Logo", modifier = Modifier.size(32.dp).padding(end = 8.dp))
+                    }
+                }
+                Text("RapiDoc", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
             }
-            Text("Quick Entry", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+            IconButton(onClick = onSettings) {
+                Icon(Icons.Filled.Settings, contentDescription = "Settings")
+            }
         }
 
         val isValidName = reportInput.patient.name.trim().length >= 2
         val isValidAge = reportInput.patient.ageYears.toIntOrNull() in 0..120
         
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text("Normal Toggle (resets input)")
-            Spacer(Modifier.width(8.dp))
-            Switch(checked = forceNormal, onCheckedChange = onForceNormal)
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+        ) {
+            Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text("Patient Information", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("Normal Toggle (resets input)", style = MaterialTheme.typography.bodyMedium)
+                    Spacer(Modifier.width(8.dp))
+                    Switch(checked = forceNormal, onCheckedChange = onForceNormal)
+                }
+
+                OutlinedTextField(
+                    value = reportInput.patient.name,
+                    onValueChange = {
+                        onInputChange(reportInput.copy(patient = reportInput.patient.copy(name = it.trimStart())))
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    isError = !isValidName && reportInput.patient.name.isNotEmpty(),
+                    label = { Text("Patient Name*") }
+                )
+
+                OutlinedTextField(
+                    value = reportInput.patient.patientId,
+                    onValueChange = {
+                        onInputChange(reportInput.copy(patient = reportInput.patient.copy(patientId = it.trim())))
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    label = { Text("Patient ID (optional)") }
+                )
+
+                OutlinedTextField(
+                    value = reportInput.patient.ageYears,
+                    onValueChange = {
+                        onInputChange(reportInput.copy(patient = reportInput.patient.copy(ageYears = it.filter(Char::isDigit))))
+                    },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    modifier = Modifier.fillMaxWidth(),
+                    isError = !isValidAge && reportInput.patient.ageYears.isNotEmpty(),
+                    label = { Text("Age*") }
+                )
+
+                EnumSelector(
+                    label = "Gender*",
+                    options = Sex.entries,
+                    selected = reportInput.patient.sex,
+                    enabled = true,
+                    onSelect = { onInputChange(reportInput.copy(patient = reportInput.patient.copy(sex = it))) }
+                )
+            }
         }
-
-        OutlinedTextField(
-            value = reportInput.patient.name,
-            onValueChange = {
-                onInputChange(reportInput.copy(patient = reportInput.patient.copy(name = it.trimStart())))
-            },
-            modifier = Modifier.fillMaxWidth(),
-            isError = !isValidName && reportInput.patient.name.isNotEmpty(),
-            label = { Text("Patient Name*") }
-        )
-
-        OutlinedTextField(
-            value = reportInput.patient.patientId,
-            onValueChange = {
-                onInputChange(reportInput.copy(patient = reportInput.patient.copy(patientId = it.trim())))
-            },
-            modifier = Modifier.fillMaxWidth(),
-            label = { Text("Patient ID (optional)") }
-        )
-
-        OutlinedTextField(
-            value = reportInput.patient.ageYears,
-            onValueChange = {
-                onInputChange(reportInput.copy(patient = reportInput.patient.copy(ageYears = it.filter(Char::isDigit))))
-            },
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-            modifier = Modifier.fillMaxWidth(),
-            isError = !isValidAge && reportInput.patient.ageYears.isNotEmpty(),
-            label = { Text("Age*") }
-        )
-
-        EnumSelector(
-            label = "Gender*",
-            options = Sex.entries,
-            selected = reportInput.patient.sex,
-            enabled = true,
-            onSelect = { onInputChange(reportInput.copy(patient = reportInput.patient.copy(sex = it))) }
-        )
 
         // Liver
         OrganSection("Liver", findings.liverPrintMode, forceNormal,
@@ -710,32 +763,44 @@ private fun QuickEntryScreen(
             }
         }
 
-        Spacer(Modifier.height(6.dp))
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Button(onClick = onGoPreview, modifier = Modifier.weight(1f)) {
-                Text("Go To Preview")
-            }
-            
-            var showResetDialog by remember { mutableStateOf(false) }
-            Button(onClick = { showResetDialog = true }) { Text("Reset") }
+        Spacer(Modifier.height(16.dp))
+        var showResetDialog by remember { mutableStateOf(false) }
 
-            if (showResetDialog) {
-                AlertDialog(
-                    onDismissRequest = { showResetDialog = false },
-                    title = { Text("Reset Form") },
-                    text = { Text("Are you sure you want to clear all form data?") },
-                    confirmButton = {
-                        TextButton(onClick = {
-                            onInputChange(ReportInput(PatientInfo(), FindingsInput()))
-                            onForceNormal(false)
-                            showResetDialog = false
-                        }) { Text("Yes, Reset") }
-                    },
-                    dismissButton = {
-                        TextButton(onClick = { showResetDialog = false }) { Text("Cancel") }
-                    }
-                )
-            }
+        Button(
+            onClick = onGoPreview,
+            modifier = Modifier.fillMaxWidth().height(56.dp),
+            shape = MaterialTheme.shapes.medium,
+            colors = ButtonDefaults.buttonColors(
+                containerColor = MaterialTheme.colorScheme.primary,
+                contentColor = MaterialTheme.colorScheme.onPrimary
+            )
+        ) {
+            Text("Generate PDF Report", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+        }
+        
+        TextButton(
+            onClick = { showResetDialog = true },
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text("Reset Form", color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+
+        if (showResetDialog) {
+            AlertDialog(
+                onDismissRequest = { showResetDialog = false },
+                title = { Text("Reset Form") },
+                text = { Text("Are you sure you want to clear all form data?") },
+                confirmButton = {
+                    TextButton(onClick = {
+                        onInputChange(ReportInput(PatientInfo(), FindingsInput()))
+                        onForceNormal(false)
+                        showResetDialog = false
+                    }) { Text("Yes, Reset", color = MaterialTheme.colorScheme.error) }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showResetDialog = false }) { Text("Cancel") }
+                }
+            )
         }
     }
 }
@@ -748,19 +813,26 @@ private fun OrganSection(
     onModeChange: (OrganPrintMode) -> Unit,
     content: @Composable () -> Unit
 ) {
-    Column(modifier = Modifier.fillMaxWidth().background(Color(0xFFF9F9F9)).padding(8.dp)) {
-        Text(title, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
-        EnumSelector(
-            label = "Print Mode",
-            options = OrganPrintMode.entries,
-            selected = mode,
-            enabled = !forceNormal,
-            itemLabel = { it.name },
-            onSelect = onModeChange
-        )
-        if (mode == OrganPrintMode.ABNORMAL && !forceNormal) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+    ) {
+        Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
+            Text(title, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
             Spacer(Modifier.height(8.dp))
-            content()
+            EnumSelector(
+                label = "Print Mode",
+                options = OrganPrintMode.entries,
+                selected = mode,
+                enabled = !forceNormal,
+                itemLabel = { it.name },
+                onSelect = onModeChange
+            )
+            if (mode == OrganPrintMode.ABNORMAL && !forceNormal) {
+                Spacer(Modifier.height(16.dp))
+                content()
+            }
         }
     }
 }
@@ -805,7 +877,7 @@ private fun PreviewScreen(
         Text("Age/Gender: ${reportInput.patient.ageYears} / ${reportInput.patient.sex.name}")
 
         Text("Impression", fontWeight = FontWeight.Bold)
-        val impressionColor = if (reportBody.isNormal) Color(0xFF2E7D32) else Color(0xFFC62828)
+        val impressionColor = if (reportBody.isNormal) com.alshifa.rapidocusg.ui.theme.StatusNormal else com.alshifa.rapidocusg.ui.theme.StatusAbnormal
         reportBody.impressionLines.forEach {
             Text("• $it", color = impressionColor)
         }
@@ -824,8 +896,8 @@ private fun PreviewScreen(
                     }
                 },
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = if (isValid) MaterialTheme.colorScheme.primary else Color.Gray,
-                    contentColor = if (isValid) MaterialTheme.colorScheme.onPrimary else Color.LightGray
+                    containerColor = if (isValid) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
+                    contentColor = if (isValid) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
                 )
             ) { Text("Generate PDF") }
             Button(onClick = onPrint) { Text("Print") }
@@ -858,7 +930,7 @@ private fun PdfPreviewBox(file: File?) {
         modifier = Modifier
             .fillMaxWidth()
             .height(320.dp)
-            .background(Color(0xFFF3F3F3)),
+            .background(MaterialTheme.colorScheme.surfaceVariant),
         contentAlignment = Alignment.Center
     ) {
         if (file == null || !file.exists()) {
