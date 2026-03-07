@@ -12,6 +12,9 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.Alignment
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import com.alshifa.rapidocusg.core.documentengine.*
 import com.alshifa.rapidocusg.core.parser.SystemKeywords
 import java.time.LocalDate
@@ -57,7 +60,12 @@ fun LeaveCertificateFormScreen(
             diagnosisOrReason.length <= 120 && notes.length <= 120
 
     Column(Modifier.fillMaxSize().padding(16.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text("Medical Leave Certificate", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            IconButton(onClick = onBack) {
+                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+            }
+            Text("Medical Leave Certificate", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+        }
         
         OutlinedTextField(
             value = name,

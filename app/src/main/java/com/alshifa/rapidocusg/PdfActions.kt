@@ -32,10 +32,14 @@ object PdfActions {
         val shareIntent = Intent(Intent.ACTION_SEND).apply {
             type = "application/pdf"
             putExtra(Intent.EXTRA_STREAM, uri)
+            putExtra(Intent.EXTRA_SUBJECT, file.name)
+            clipData = android.content.ClipData.newRawUri("", uri)
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
         }
 
-        context.startActivity(Intent.createChooser(shareIntent, "Share report PDF"))
+        val chooser = Intent.createChooser(shareIntent, "Share report PDF")
+        chooser.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        context.startActivity(chooser)
     }
 }
 

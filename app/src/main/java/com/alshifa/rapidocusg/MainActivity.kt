@@ -60,6 +60,10 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -299,7 +303,8 @@ private fun RapiDocApp() {
                 onInputChange = { reportInput = it; forceNormal = false },
                 onForceNormal = { enabled -> forceNormal = enabled; if (enabled) reportInput = reportInput.copy(findings = FindingsInput()) },
                 onLoadNormal = { reportInput = reportInput.copy(findings = FindingsInput()); forceNormal = false },
-                onGoPreview = { navController.navigate("doc/usg_abdomen/preview") }
+                onGoPreview = { navController.navigate("doc/usg_abdomen/preview") },
+                onBack = { navController.popBackStack() }
             )
         }
         composable("doc/usg_abdomen/preview") {
@@ -407,11 +412,14 @@ private fun SettingsScreen(
 ) {
     var header by remember(settings.headerText) { mutableStateOf(settings.headerText) }
     var showReset by remember { mutableStateOf(false) }
-    val context = LocalContext.current
-    val isDebugBuild = (context.applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE) != 0
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri -> onUpdateLogo(uri) }
     Column(Modifier.fillMaxSize().padding(16.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        Text("Settings", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            IconButton(onClick = onBack) {
+                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+            }
+            Text("Settings", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+        }
         
         HorizontalDivider()
         Text("Branding", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
@@ -480,8 +488,8 @@ private fun QuickEntryScreen(
     onInputChange: (ReportInput) -> Unit,
     onForceNormal: (Boolean) -> Unit,
     onLoadNormal: () -> Unit,
-
-    onGoPreview: () -> Unit
+    onGoPreview: () -> Unit,
+    onBack: () -> Unit
 ) {
     val findings = reportInput.findings
     val context = LocalContext.current
@@ -493,11 +501,15 @@ private fun QuickEntryScreen(
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
-        Text("Quick Entry", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            IconButton(onClick = onBack) {
+                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+            }
+            Text("Quick Entry", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+        }
 
         val isValidName = reportInput.patient.name.trim().length >= 2
         val isValidAge = reportInput.patient.ageYears.toIntOrNull() in 0..120
-        val isValidSex = reportInput.patient.sex != Sex.UNSET
         
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text("Normal Toggle (resets input)")
@@ -773,7 +785,12 @@ private fun PreviewScreen(
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
-        Text("Preview", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            IconButton(onClick = onBack) {
+                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+            }
+            Text("Preview", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+        }
         Text("Patient: ${reportInput.patient.name}")
         val trimmedPatientId = reportInput.patient.patientId.trim()
         if (trimmedPatientId.isNotEmpty()) {

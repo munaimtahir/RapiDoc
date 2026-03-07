@@ -1,0 +1,24 @@
+appId: com.alshifa.rapidocusg
+---
+- launchApp:
+    clearState: true
+
+# Basic smoke test to see if the app launches and the buttons are on screen
+- assertVisible: ".*USG Abdomen.*"
+- assertVisible: ".*Medical Certificate.*"
+
+# Example of a flow: tapping on "USG Abdomen"
+- tapOn:
+    text: ".*USG Abdomen.*"
+    retryTapIfNoChange: false
+
+# On the USG form page, verify key fields exist
+- assertVisible: "Patient Name"
+- assertVisible: "Age"
+
+# To enter data and test submission:
+- inputText: "Test John Doe"
+- tapOn: "Age"
+- inputText: "45"
+
+- tapOn: "Generate PDF"
