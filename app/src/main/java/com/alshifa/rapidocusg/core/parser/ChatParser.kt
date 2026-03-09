@@ -22,6 +22,9 @@ object SystemKeywords {
     const val DOC_USG = "doc_usg"
     const val DOC_LEAVE = "doc_leave"
     const val DOC_FITNESS = "doc_fitness"
+    const val DOC_KUB = "doc_kub"
+    const val DOC_PELVIS = "doc_pelvis"
+    const val DOC_OBSTETRIC = "doc_obstetric"
     const val KEY_NAME = "key_name"
     const val KEY_AGE = "key_age"
     const val KEY_SEX = "key_sex"
@@ -36,7 +39,7 @@ object SystemKeywords {
     const val KEY_RESTRICTIONS = "key_restrictions"
     const val KEY_REMARKS = "key_remarks"
 
-    val all = listOf(DOC_USG, DOC_LEAVE, DOC_FITNESS, KEY_NAME, KEY_AGE, KEY_SEX, KEY_ID, KEY_DX, KEY_REASON, KEY_DAYS, KEY_START, KEY_DATE_FROM, KEY_DATE_TO, KEY_PURPOSE, KEY_RESTRICTIONS, KEY_REMARKS)
+    val all = listOf(DOC_USG, DOC_LEAVE, DOC_FITNESS, DOC_KUB, DOC_PELVIS, DOC_OBSTETRIC, KEY_NAME, KEY_AGE, KEY_SEX, KEY_ID, KEY_DX, KEY_REASON, KEY_DAYS, KEY_START, KEY_DATE_FROM, KEY_DATE_TO, KEY_PURPOSE, KEY_RESTRICTIONS, KEY_REMARKS)
 }
 
 object ChatParser {
@@ -48,6 +51,10 @@ object ChatParser {
         "fit" to SystemKeywords.DOC_FITNESS,
         "abdomen" to SystemKeywords.DOC_USG,
         "usg" to SystemKeywords.DOC_USG,
+        "kub" to SystemKeywords.DOC_KUB,
+        "pelvis" to SystemKeywords.DOC_PELVIS,
+        "obstetric" to SystemKeywords.DOC_OBSTETRIC,
+        "obs" to SystemKeywords.DOC_OBSTETRIC,
         "dx" to SystemKeywords.KEY_DX,
         "diagnosis" to SystemKeywords.KEY_DX,
         "reason" to SystemKeywords.KEY_REASON,
@@ -85,6 +92,9 @@ object ChatParser {
                             SystemKeywords.DOC_LEAVE -> docTypesFound.add(DocumentType.MEDICAL_LEAVE_CERT)
                             SystemKeywords.DOC_FITNESS -> docTypesFound.add(DocumentType.MEDICAL_FITNESS_CERT)
                             SystemKeywords.DOC_USG -> docTypesFound.add(DocumentType.USG_ABDOMEN)
+                            SystemKeywords.DOC_KUB -> docTypesFound.add(DocumentType.USG_KUB)
+                            SystemKeywords.DOC_PELVIS -> docTypesFound.add(DocumentType.USG_PELVIS)
+                            SystemKeywords.DOC_OBSTETRIC -> docTypesFound.add(DocumentType.USG_OBSTETRIC)
                             else -> replacedTokens.add(systemKw) 
                         }
                         tsIdx += pTokens.size
@@ -119,6 +129,9 @@ object ChatParser {
                     SystemKeywords.DOC_LEAVE -> docTypesFound.add(DocumentType.MEDICAL_LEAVE_CERT)
                     SystemKeywords.DOC_FITNESS -> docTypesFound.add(DocumentType.MEDICAL_FITNESS_CERT)
                     SystemKeywords.DOC_USG -> docTypesFound.add(DocumentType.USG_ABDOMEN)
+                    SystemKeywords.DOC_KUB -> docTypesFound.add(DocumentType.USG_KUB)
+                    SystemKeywords.DOC_PELVIS -> docTypesFound.add(DocumentType.USG_PELVIS)
+                    SystemKeywords.DOC_OBSTETRIC -> docTypesFound.add(DocumentType.USG_OBSTETRIC)
                     else -> filledFields[systemKey] = parseValue(stripQuotes(v))
                 }
                 i++
@@ -131,6 +144,9 @@ object ChatParser {
                     SystemKeywords.DOC_LEAVE -> docTypesFound.add(DocumentType.MEDICAL_LEAVE_CERT)
                     SystemKeywords.DOC_FITNESS -> docTypesFound.add(DocumentType.MEDICAL_FITNESS_CERT)
                     SystemKeywords.DOC_USG -> docTypesFound.add(DocumentType.USG_ABDOMEN)
+                    SystemKeywords.DOC_KUB -> docTypesFound.add(DocumentType.USG_KUB)
+                    SystemKeywords.DOC_PELVIS -> docTypesFound.add(DocumentType.USG_PELVIS)
+                    SystemKeywords.DOC_OBSTETRIC -> docTypesFound.add(DocumentType.USG_OBSTETRIC)
                     else -> {
                         if (i + 1 < replacedTokens.size) {
                             filledFields[systemKw] = parseValue(stripQuotes(replacedTokens[i+1]))

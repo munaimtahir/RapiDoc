@@ -44,6 +44,7 @@ data class FindingsInput(
     val gbPrintMode: OrganPrintMode = OrganPrintMode.NORMAL,
     val gallstones: Boolean = false,
     val gallstoneSizeMm: String = "",
+    val cholecystectomy: Boolean = false,
 
     val cbdPrintMode: OrganPrintMode = OrganPrintMode.SKIP,
 

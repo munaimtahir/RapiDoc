@@ -1,14 +1,30 @@
 package com.alshifa.rapidocusg.core.documentengine
 
 import android.content.Context
+import android.graphics.Bitmap
 import android.graphics.BitmapFactory
-import android.graphics.Canvas
-import android.graphics.Color
-import android.graphics.Paint
-import android.graphics.RectF
-import android.graphics.pdf.PdfDocument
+import android.util.Log
 import com.alshifa.rapidocusg.PdfGenerator
 import com.alshifa.rapidocusg.RulesEngine
+import com.alshifa.rapidocusg.KubRulesEngine
+import com.alshifa.rapidocusg.PelvisRulesEngine
+import com.alshifa.rapidocusg.ObstetricRulesEngine
+import com.itextpdf.io.image.ImageDataFactory
+import com.itextpdf.kernel.colors.DeviceRgb
+import com.itextpdf.kernel.pdf.PdfDocument
+import com.itextpdf.kernel.pdf.PdfReader
+import com.itextpdf.kernel.pdf.PdfWriter
+import com.itextpdf.layout.Document
+import com.itextpdf.layout.borders.Border
+import com.itextpdf.layout.borders.SolidBorder
+import com.itextpdf.layout.element.Cell
+import com.itextpdf.layout.element.Image
+import com.itextpdf.layout.element.Paragraph
+import com.itextpdf.layout.element.Table
+import com.itextpdf.layout.properties.TextAlignment
+import com.itextpdf.layout.properties.UnitValue
+import com.itextpdf.layout.properties.VerticalAlignment
+import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.FileOutputStream
 import java.time.format.DateTimeFormatter
@@ -28,79 +44,175 @@ object UsgRenderer : DocumentRenderer<DocumentPayload.UsgAbdomenPayload> {
                 reportingDateTime = timing.reporting
             )
         )
-        val file = PdfGenerator.generatePdf(context, inputForPdf, RulesEngine.buildReport(inputForPdf), branding)
+        val file = PdfGenerator.generatePdf(context, "Ultrasound Abdomen Report", inputForPdf.patient, RulesEngine.buildReport(inputForPdf), branding)
         return RenderedDocument(file, "USG Abdomen")
     }
 }
 
+object KubRenderer : DocumentRenderer<DocumentPayload.UsgKubPayload> {
+    override val type = DocumentType.USG_KUB
+    override fun validate(payload: DocumentPayload.UsgKubPayload): List<String> = buildList {
+        if (payload.reportInput.patient.name.isBlank()) add("Patient name required")
+        if (payload.reportInput.patient.ageYears.isBlank()) add("Age required")
+    }
+
+    override fun render(context: Context, payload: DocumentPayload.UsgKubPayload, branding: BrandingConfig, timing: TimingConfig): RenderedDocument {
+        val inputForPdf = payload.reportInput.copy(
+            patient = payload.reportInput.patient.copy(
+                bookingDateTime = timing.booking,
+                reportingDateTime = timing.reporting
+            )
+        )
+        val file = PdfGenerator.generatePdf(context, "Ultrasound KUB / Renal Tract Report", inputForPdf.patient, KubRulesEngine.buildReport(inputForPdf), branding)
+        return RenderedDocument(file, "USG KUB / Renal Tract")
+    }
+}
+
+object PelvisRenderer : DocumentRenderer<DocumentPayload.UsgPelvisPayload> {
+    override val type = DocumentType.USG_PELVIS
+    override fun validate(payload: DocumentPayload.UsgPelvisPayload): List<String> = buildList {
+        if (payload.reportInput.patient.name.isBlank()) add("Patient name required")
+        if (payload.reportInput.patient.ageYears.isBlank()) add("Age required")
+    }
+
+    override fun render(context: Context, payload: DocumentPayload.UsgPelvisPayload, branding: BrandingConfig, timing: TimingConfig): RenderedDocument {
+        val inputForPdf = payload.reportInput.copy(
+            patient = payload.reportInput.patient.copy(
+                bookingDateTime = timing.booking,
+                reportingDateTime = timing.reporting
+            )
+        )
+        val file = PdfGenerator.generatePdf(context, "Ultrasound Pelvis Report", inputForPdf.patient, PelvisRulesEngine.buildReport(inputForPdf), branding)
+        return RenderedDocument(file, "USG Pelvis")
+    }
+}
+
+object ObstetricRenderer : DocumentRenderer<DocumentPayload.UsgObstetricPayload> {
+    override val type = DocumentType.USG_OBSTETRIC
+    override fun validate(payload: DocumentPayload.UsgObstetricPayload): List<String> = buildList {
+        if (payload.reportInput.patient.name.isBlank()) add("Patient name required")
+        if (payload.reportInput.patient.ageYears.isBlank()) add("Age required")
+        val weeks = payload.reportInput.findings.gaWeeks.toIntOrNull()
+        if (weeks == null || weeks <= 0) add("Gestational Age (Weeks) required")
+    }
+
+    override fun render(context: Context, payload: DocumentPayload.UsgObstetricPayload, branding: BrandingConfig, timing: TimingConfig): RenderedDocument {
+        val inputForPdf = payload.reportInput.copy(
+            patient = payload.reportInput.patient.copy(
+                bookingDateTime = timing.booking,
+                reportingDateTime = timing.reporting
+            )
+        )
+        val file = PdfGenerator.generatePdf(context, "Ultrasound Obstetric Report", inputForPdf.patient, ObstetricRulesEngine.buildReport(inputForPdf), branding)
+        return RenderedDocument(file, "USG Obstetric")
+    }
+}
+
+
 private object SimpleDocPdf {
     private val fileDateTime = DateTimeFormatter.ofPattern("yyyyMMdd_HHmm", Locale.US)
-    fun render(context: Context, title: String, branding: BrandingConfig, timing: TimingConfig, patient: PatientDemographics, bodyLines: List<String>): File {
-        val doc = PdfDocument()
-        val page = doc.startPage(PdfDocument.PageInfo.Builder(595, 842, 1).create())
-        val canvas = page.canvas
-        val text = Paint().apply { color = Color.BLACK; textSize = 11f; isAntiAlias = true }
-        val bold = Paint(text).apply { isFakeBoldText = true; textSize = 13f }
+    private val colorGray = DeviceRgb(200, 200, 200)
 
-        drawHeader(context, canvas, branding, title, bold)
-        var y = 100f
-        val rows = buildList {
-            add("Patient Name" to patient.name)
-            patient.patientId?.trim()?.takeIf { it.isNotBlank() }?.let { add("Patient ID" to it) }
-            patient.age?.let { age -> add("Age/Gender" to "$age / ${patient.gender.orEmpty()}") }
-            patient.phone?.trim()?.takeIf { it.isNotBlank() }?.let { add("Phone" to it) }
-            add("Date/Time" to timing.reporting.format(DateTimeFormatter.ofPattern("dd MMM yyyy, hh:mm a", Locale.US)))
-        }
-        y = drawTable(canvas, y, rows, text)
-        y += 20f
-        bodyLines.forEach { line ->
-            wrap(line, text, 500f).forEach { w -> canvas.drawText(w, 40f, y, text); y += 16f }
-            y += 4f
-        }
-        doc.finishPage(page)
+    fun render(context: Context, title: String, branding: BrandingConfig, timing: TimingConfig, patient: PatientDemographics, bodyLines: List<String>): File {
         val outputDir = File(context.filesDir, "reports")
         outputDir.mkdirs()
         val safeName = patient.name.replace("[^A-Za-z0-9]+".toRegex(), "_")
         val file = File(outputDir, "${title.replace(' ','_')}_${safeName}_${timing.reporting.format(fileDateTime)}.pdf")
-        FileOutputStream(file).use { doc.writeTo(it) }
-        doc.close()
+
+        FileOutputStream(file).use { fos ->
+            val pdfDoc = PdfDocument(PdfWriter(fos))
+            val document = Document(pdfDoc)
+            document.setMargins(40f, 40f, 40f, 40f)
+
+            // Header Area
+            val headerTable = Table(UnitValue.createPercentArray(floatArrayOf(1f, 3f)))
+            headerTable.setWidth(UnitValue.createPercentValue(100f))
+
+            val logoBmp = branding.logoPathOrUri?.let { runCatching { BitmapFactory.decodeFile(it) }.getOrNull() }
+                ?: BitmapFactory.decodeResource(context.resources, com.alshifa.rapidocusg.R.drawable.polyclinic_logo)
+
+            val logoCell = Cell().setBorder(Border.NO_BORDER)
+            if (logoBmp != null) {
+                val stream = ByteArrayOutputStream()
+                logoBmp.compress(Bitmap.CompressFormat.PNG, 100, stream)
+                val imgData = ImageDataFactory.create(stream.toByteArray())
+                val image = Image(imgData).scaleToFit(80f, 50f)
+                logoCell.add(image)
+            }
+            headerTable.addCell(logoCell)
+
+            val titleCell = Cell().setBorder(Border.NO_BORDER).setVerticalAlignment(VerticalAlignment.MIDDLE)
+            titleCell.add(Paragraph(branding.headerText).setBold().setFontSize(14f))
+            titleCell.add(Paragraph(title).setBold().setFontSize(12f))
+            headerTable.addCell(titleCell)
+
+            document.add(headerTable)
+            document.add(Paragraph("\n").setFontSize(10f))
+
+            // Demographics Table
+            val demoTable = Table(UnitValue.createPercentArray(floatArrayOf(1.5f, 3.5f)))
+            demoTable.setWidth(UnitValue.createPercentValue(100f))
+
+            val border = SolidBorder(colorGray, 1f)
+            fun addRow(label: String, value: String) {
+                demoTable.addCell(Cell().add(Paragraph(label).setBold().setFontSize(11f)).setBorder(border).setPadding(4f))
+                demoTable.addCell(Cell().add(Paragraph(value).setFontSize(11f)).setBorder(border).setPadding(4f))
+            }
+
+            addRow("Patient Name", patient.name)
+            patient.patientId?.trim()?.takeIf { it.isNotBlank() }?.let { addRow("Patient ID", it) }
+            patient.age?.let { age -> addRow("Age/Gender", "$age / ${patient.gender.orEmpty()}") }
+            patient.phone?.trim()?.takeIf { it.isNotBlank() }?.let { addRow("Phone", it) }
+            addRow("Date/Time", timing.reporting.format(DateTimeFormatter.ofPattern("dd MMM yyyy, hh:mm a", Locale.US)))
+
+            document.add(demoTable)
+            document.add(Paragraph("\n").setFontSize(10f))
+
+            // Body Lines
+            for (line in bodyLines) {
+                document.add(Paragraph(line).setFontSize(11f).setMarginBottom(8f))
+            }
+
+            // Footer
+            val footer = Paragraph("Electronically verified. Laboratory results should be interpreted by a physician in correlation with clinical and radiologic findings.")
+                .setFontSize(9f)
+                .setTextAlignment(TextAlignment.LEFT)
+                .setFixedPosition(40f, 40f, 515f)
+            document.add(footer)
+
+            document.close()
+        }
+
+        // Validate
+        if (!validatePdf(file)) {
+            throw IllegalStateException("Generated PDF failed validation.")
+        }
+
         return file
     }
 
-    private fun drawHeader(context: Context, canvas: Canvas, branding: BrandingConfig, title: String, paint: Paint) {
-        val logoBmp = branding.logoPathOrUri?.let { runCatching { BitmapFactory.decodeFile(it) }.getOrNull() }
-            ?: BitmapFactory.decodeResource(context.resources, com.alshifa.rapidocusg.R.drawable.polyclinic_logo)
-        logoBmp?.let { canvas.drawBitmap(it, null, RectF(40f, 20f, 120f, 70f), null) }
-        canvas.drawText(branding.headerText, 135f, 45f, paint)
-        canvas.drawText(title, 135f, 65f, paint)
-    }
-
-    private fun drawTable(canvas: Canvas, startY: Float, rows: List<Pair<String, String>>, paint: Paint): Float {
-        var y = startY
-        val line = Paint().apply { color = Color.LTGRAY; strokeWidth = 1f }
-        val left = 40f; val mid = 180f; val right = 555f; val h = 24f
-        rows.forEach { (l, v) ->
-            canvas.drawText(l, left + 4f, y + 16f, paint)
-            canvas.drawText(v, mid + 4f, y + 16f, paint)
-            canvas.drawLine(left, y + h, right, y + h, line)
-            y += h
+    private fun validatePdf(file: File): Boolean {
+        if (!file.exists() || file.length() == 0L) return false
+        try {
+            val raf = java.io.RandomAccessFile(file, "r")
+            val length = raf.length()
+            if (length < 6) return false
+            raf.seek(length - 100)
+            val buffer = ByteArray(100)
+            raf.read(buffer)
+            raf.close()
+            if (!String(buffer).contains("%%EOF")) return false
+        } catch (e: Exception) {
+            return false
         }
-        canvas.drawLine(left, startY, right, startY, line)
-        canvas.drawLine(left, startY, left, y, line)
-        canvas.drawLine(mid, startY, mid, y, line)
-        canvas.drawLine(right, startY, right, y, line)
-        return y
-    }
-
-    private fun wrap(t: String, p: Paint, w: Float): List<String> {
-        val out = mutableListOf<String>()
-        var cur = ""
-        for (word in t.split(" ")) {
-            val nxt = if (cur.isBlank()) word else "$cur $word"
-            if (p.measureText(nxt) <= w) cur = nxt else { out += cur; cur = word }
+        try {
+            val doc = PdfDocument(PdfReader(file.absolutePath))
+            if (doc.numberOfPages <= 0) return false
+            doc.close()
+        } catch (e: Exception) {
+            return false
         }
-        if (cur.isNotBlank()) out += cur
-        return out
+        return true
     }
 }
 
@@ -119,10 +231,8 @@ object LeaveCertificateRenderer : DocumentRenderer<DocumentPayload.LeaveCertific
         val endStr = payload.endDate.format(dtFormatter)
         
         lines += "This is to certify that Mr/Ms ${payload.patient.name}, aged ${payload.patient.age} years, was examined and is advised rest for ${payload.durationDays} day(s) from $startStr to $endStr due to ${payload.diagnosisOrReason}."
-        lines += ""
         if (payload.notes.isNotBlank()) {
             lines += "Notes: ${payload.notes}"
-            lines += ""
         }
         lines += "This certificate is issued based on clinical examination. Verification may be required where applicable."
         
@@ -143,14 +253,11 @@ object FitnessCertificateRenderer : DocumentRenderer<DocumentPayload.FitnessCert
         val lines = mutableListOf<String>()
         
         lines += "This is to certify that Mr/Ms ${payload.patient.name}, aged ${payload.patient.age} years, was examined and is found medically fit for ${payload.purposeText}."
-        lines += ""
         if (!payload.restrictionsText.isNullOrBlank()) {
             lines += "Restrictions: ${payload.restrictionsText}"
-            lines += ""
         }
         if (payload.remarks.isNotBlank()) {
             lines += "Remarks: ${payload.remarks}"
-            lines += ""
         }
         lines += "This certificate is issued based on clinical examination. Verification may be required where applicable."
         

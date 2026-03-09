@@ -1,80 +1,10 @@
 package com.alshifa.rapidocusg
 
-object RulesEngine {
+object KubRulesEngine {
 
-    fun buildReport(input: ReportInput): ReportBody {
+    fun buildReport(input: KubReportInput): ReportBody {
         val f = input.findings
         val findings = mutableListOf<String>()
-
-        // Liver (includes Ascites)
-        if (f.liverPrintMode == OrganPrintMode.NORMAL) {
-            findings += "Liver is normal in size with normal echotexture. No focal lesion or intrahepatic biliary dilatation."
-            findings += "No free fluid is seen."
-        } else if (f.liverPrintMode == OrganPrintMode.ABNORMAL) {
-            when (f.fattyGrade) {
-                1 -> findings += "Liver shows mildly increased echogenicity consistent with Grade I fatty liver. No focal lesion or intrahepatic biliary dilatation."
-                2 -> findings += "Liver shows moderately increased echogenicity consistent with Grade II fatty liver. No focal lesion or intrahepatic biliary dilatation."
-                3 -> findings += "Liver shows markedly increased echogenicity consistent with Grade III fatty liver. No focal lesion or intrahepatic biliary dilatation."
-            }
-            if (f.hepatomegaly != Hepatomegaly.NONE) {
-                findings += "Liver is enlarged in size (hepatomegaly) with preserved outline."
-            }
-            if (f.cld) {
-                findings += "Liver shows coarse echotexture with irregular margins suggestive of chronic liver disease."
-            }
-            when (f.ascites) {
-                Ascites.MILD -> findings += "Free fluid (ascites) is seen in abdomen, mild in amount."
-                Ascites.MODERATE -> findings += "Free fluid (ascites) is seen in abdomen, moderate in amount."
-                Ascites.GROSS -> findings += "Free fluid (ascites) is seen in abdomen, gross in amount."
-                Ascites.NONE -> Unit
-            }
-        }
-
-        // Gallbladder
-        if (f.gbPrintMode == OrganPrintMode.NORMAL) {
-            findings += "Gallbladder is normal with no calculi or pericholecystic fluid."
-        } else if (f.gbPrintMode == OrganPrintMode.ABNORMAL) {
-            if (f.cholecystectomy) {
-                findings += "Gallbladder is not visualized, consistent with history of cholecystectomy."
-            } else if (f.gallstones) {
-                val mm = f.gallstoneSizeMm.toIntOrNull()
-                if (mm != null && mm > 0) {
-                    findings += "Mobile echogenic foci with posterior acoustic shadowing are seen within gallbladder, consistent with cholelithiasis. Largest calculus measures $mm mm."
-                } else {
-                    findings += "Mobile echogenic foci with posterior acoustic shadowing are seen within gallbladder, consistent with cholelithiasis."
-                }
-            }
-        }
-
-        // CBD
-        if (f.cbdPrintMode == OrganPrintMode.NORMAL) {
-            findings += "Common bile duct is normal in caliber."
-        } else if (f.cbdPrintMode == OrganPrintMode.ABNORMAL) {
-            findings += "Common bile duct appears abnormal." // Placeholder for ABNORMAL CBD
-        }
-
-        // Pancreas
-        if (f.pancreasPrintMode == OrganPrintMode.NORMAL) {
-            findings += "Pancreas is normal in size and echotexture."
-        } else if (f.pancreasPrintMode == OrganPrintMode.ABNORMAL) {
-            findings += "Pancreas appears abnormal." // Placeholder for ABNORMAL Pancreas
-        }
-
-        // Spleen
-        if (f.spleenPrintMode == OrganPrintMode.NORMAL) {
-            findings += "Spleen is normal in size and echotexture."
-        } else if (f.spleenPrintMode == OrganPrintMode.ABNORMAL) {
-            if (f.splenomegaly) {
-                val cm = f.spleenSizeCm.toFloatOrNull()
-                if (cm != null && cm > 0f) {
-                    // removing trailing zero if it exists for whole numbers but let's just use string
-                    val sizeStr = if (cm % 1 == 0f) cm.toInt().toString() else cm.toString()
-                    findings += "Spleen is enlarged measuring $sizeStr cm."
-                } else {
-                    findings += "Spleen is enlarged in size (splenomegaly)."
-                }
-            }
-        }
 
         // Right Kidney
         appendKidneyFindings(
@@ -107,8 +37,7 @@ object RulesEngine {
         if (f.rkPrintMode != OrganPrintMode.SKIP || f.lkPrintMode != OrganPrintMode.SKIP) {
             if (f.obstruction == Obstruction.NOT_SEEN) {
                 findings += "No sonographic evidence of obstruction."
-            }
-            if (f.obstruction == Obstruction.SUSPECTED) {
+            } else if (f.obstruction == Obstruction.SUSPECTED) {
                 findings += "Obstruction is suspected. Clinical correlation is advised."
             }
         }
@@ -117,11 +46,38 @@ object RulesEngine {
         if (f.bladderPrintMode == OrganPrintMode.NORMAL) {
             findings += "Urinary bladder is adequately distended with normal wall thickness. No intraluminal lesion."
         } else if (f.bladderPrintMode == OrganPrintMode.ABNORMAL) {
-            findings += "Urinary bladder appears abnormal." // Placeholder
+            if (f.bladderWallStatus == BladderWallStatus.THICKENED) {
+                findings += "Urinary bladder wall is thickened and irregular."
+            }
+            if (f.bladderStone) {
+                val stoneMm = f.bladderStoneSizeMm.toIntOrNull()
+                if (stoneMm != null && stoneMm > 0) {
+                    findings += "An echogenic calculus measuring $stoneMm mm is seen within the urinary bladder lumen."
+                } else {
+                    findings += "An echogenic calculus with posterior acoustic shadowing is seen within the urinary bladder lumen."
+                }
+            }
+            if (f.postVoidResidual == PostVoidResidual.SIGNIFICANT) {
+                findings += "Significant post-void residual volume is noted."
+            }
+        }
+
+        // Prostate
+        if (f.prostatePrintMode == OrganPrintMode.NORMAL) {
+            findings += "Prostate is normal in size and echotexture."
+        } else if (f.prostatePrintMode == OrganPrintMode.ABNORMAL) {
+            if (f.prostateEnlarged) {
+                val volCc = f.prostateVolCc.toIntOrNull()
+                if (volCc != null && volCc > 0) {
+                    findings += "Prostate is enlarged with an estimated volume of $volCc cc."
+                } else {
+                    findings += "Prostate is enlarged in size."
+                }
+            }
         }
 
         val impressions = buildImpression(f)
-        val isNormal = impressions.size == 1 && impressions[0] == "Normal abdominal ultrasound."
+        val isNormal = impressions.size == 1 && impressions[0] == "Normal KUB ultrasound."
 
         return ReportBody(
             findingsLines = findings,
@@ -191,58 +147,15 @@ object RulesEngine {
         }
     }
 
-    private fun buildImpression(f: FindingsInput): List<String> {
+    private fun buildImpression(f: KubFindingsInput): List<String> {
         val items = mutableListOf<String>()
 
-        if (f.liverPrintMode == OrganPrintMode.ABNORMAL) {
-            when (f.fattyGrade) {
-                1 -> items += "Grade I fatty liver."
-                2 -> items += "Grade II fatty liver."
-                3 -> items += "Grade III fatty liver."
-            }
-            if (f.hepatomegaly != Hepatomegaly.NONE) items += "Hepatomegaly."
-            if (f.cld) items += "Features suggestive of chronic liver disease."
-            when (f.ascites) {
-                Ascites.MILD -> items += "Mild ascites."
-                Ascites.MODERATE -> items += "Moderate ascites."
-                Ascites.GROSS -> items += "Gross ascites."
-                Ascites.NONE -> Unit
-            }
-        }
-
-        if (f.gbPrintMode == OrganPrintMode.ABNORMAL) {
-            if (f.cholecystectomy) {
-                items += "Post cholecystectomy status."
-            } else if (f.gallstones) {
-                val mm = f.gallstoneSizeMm.toIntOrNull()
-                if (mm != null && mm > 0) {
-                    items += "Cholelithiasis with $mm mm largest calculus."
-                } else {
-                    items += "Cholelithiasis."
-                }
-            }
-        }
-
-        if (f.cbdPrintMode == OrganPrintMode.ABNORMAL) {
-            items += "Abnormal CBD."
-        }
-
-        if (f.pancreasPrintMode == OrganPrintMode.ABNORMAL) {
-            items += "Abnormal pancreas."
-        }
-
-        if (f.spleenPrintMode == OrganPrintMode.ABNORMAL && f.splenomegaly) {
-            val cm = f.spleenSizeCm.toFloatOrNull()
-            if (cm != null && cm > 0f) {
-                val sizeStr = if (cm % 1 == 0f) cm.toInt().toString() else cm.toString()
-                items += "Splenomegaly ($sizeStr cm)."
-            } else {
-                items += "Splenomegaly."
-            }
-        }
-
-        val stoneLeft = f.stoneLeftMm.toIntOrNull()
-        val stoneRight = f.stoneRightMm.toIntOrNull()
+        val lkHydro = if (f.lkPrintMode == OrganPrintMode.ABNORMAL) f.hydronephrosisLeft else Hydronephrosis.NONE
+        val rkHydro = if (f.rkPrintMode == OrganPrintMode.ABNORMAL) f.hydronephrosisRight else Hydronephrosis.NONE
+        val lkStone = f.stoneLeftMm.toIntOrNull()
+        val rkStone = f.stoneRightMm.toIntOrNull()
+        val lkHasStone = f.lkPrintMode == OrganPrintMode.ABNORMAL && f.stoneLeftPresent && lkStone != null && lkStone > 0 && f.stoneLeftLocation != null
+        val rkHasStone = f.rkPrintMode == OrganPrintMode.ABNORMAL && f.stoneRightPresent && rkStone != null && rkStone > 0 && f.stoneRightLocation != null
 
         if (f.lkPrintMode == OrganPrintMode.ABNORMAL && f.lkCmd == CmdState.REDUCED) {
             items += "Reduced corticomedullary differentiation in left kidney."
@@ -250,13 +163,6 @@ object RulesEngine {
         if (f.rkPrintMode == OrganPrintMode.ABNORMAL && f.rkCmd == CmdState.REDUCED) {
             items += "Reduced corticomedullary differentiation in right kidney."
         }
-
-        val lkHydro = if (f.lkPrintMode == OrganPrintMode.ABNORMAL) f.hydronephrosisLeft else Hydronephrosis.NONE
-        val rkHydro = if (f.rkPrintMode == OrganPrintMode.ABNORMAL) f.hydronephrosisRight else Hydronephrosis.NONE
-        val lkStone = stoneLeft
-        val rkStone = stoneRight
-        val lkHasStone = f.lkPrintMode == OrganPrintMode.ABNORMAL && f.stoneLeftPresent && lkStone != null && lkStone > 0 && f.stoneLeftLocation != null
-        val rkHasStone = f.rkPrintMode == OrganPrintMode.ABNORMAL && f.stoneRightPresent && rkStone != null && rkStone > 0 && f.stoneRightLocation != null
 
         val bilateralSameSeverity = lkHydro != Hydronephrosis.NONE && lkHydro == rkHydro
 
@@ -278,7 +184,7 @@ object RulesEngine {
         }
 
         if (!bilateralSameSeverity) {
-            if (lkHasStone && lkHydro == Hydronephrosis.NONE) {
+             if (lkHasStone && lkHydro == Hydronephrosis.NONE) {
                 items += "Left renal calculus ($lkStone mm) in ${stoneLocRepr(f.stoneLeftLocation!!)}."
             }
             if (rkHasStone && rkHydro == Hydronephrosis.NONE) {
@@ -314,10 +220,37 @@ object RulesEngine {
         }
 
         if (f.bladderPrintMode == OrganPrintMode.ABNORMAL) {
-            items += "Abnormal urinary bladder."
+            val bladderItems = mutableListOf<String>()
+            if (f.bladderWallStatus == BladderWallStatus.THICKENED) bladderItems += "Thickened urinary bladder wall"
+            if (f.bladderStone) {
+                val stoneMm = f.bladderStoneSizeMm.toIntOrNull()
+                if (stoneMm != null && stoneMm > 0) {
+                    bladderItems += "with $stoneMm mm calculus"
+                } else {
+                    bladderItems += "with calculus"
+                }
+            }
+            if (bladderItems.isNotEmpty()) {
+                val line = bladderItems.joinToString(" ").replaceFirstChar { it.titlecase() }
+                items += "$line."
+            } else {
+                items += "Abnormal urinary bladder."
+            }
+            if (f.postVoidResidual == PostVoidResidual.SIGNIFICANT) {
+                items += "Significant post-void residual volume." // Added period optionally? The original text logic specifies line by line.
+            }
         }
 
-        return if (items.isNotEmpty()) items else listOf("Normal abdominal ultrasound.")
+        if (f.prostatePrintMode == OrganPrintMode.ABNORMAL && f.prostateEnlarged) {
+             val volCc = f.prostateVolCc.toIntOrNull()
+             if (volCc != null && volCc > 0) {
+                 items += "Prostatomegaly ($volCc cc)."
+             } else {
+                 items += "Prostatomegaly."
+             }
+        }
+
+        return if (items.isNotEmpty()) items else listOf("Normal KUB ultrasound.")
     }
 
     private fun appendSideHydroWithStone(
@@ -332,7 +265,7 @@ object RulesEngine {
 
         val sev = hydro.name.lowercase()
         if (hasStone && stoneMm != null && stoneLoc != null) {
-            val locRepr = when (stoneLoc) {
+             val locRepr = when (stoneLoc) {
                 StoneLocation.UPPER_CALYX -> "upper calyx (upper pole)"
                 StoneLocation.MID_CALYX -> "mid calyx (mid pole)"
                 StoneLocation.LOWER_CALYX -> "lower calyx (lower pole)"

@@ -6,7 +6,7 @@ import java.io.File
 import java.time.LocalDate
 import java.time.LocalDateTime
 
-enum class DocumentType { USG_ABDOMEN, MEDICAL_LEAVE_CERT, MEDICAL_FITNESS_CERT }
+enum class DocumentType { USG_ABDOMEN, MEDICAL_LEAVE_CERT, MEDICAL_FITNESS_CERT, USG_KUB, USG_PELVIS, USG_OBSTETRIC }
 
 data class PatientDemographics(
     val patientId: String? = null,
@@ -18,6 +18,9 @@ data class PatientDemographics(
 
 sealed class DocumentPayload {
     data class UsgAbdomenPayload(val reportInput: ReportInput) : DocumentPayload()
+    data class UsgKubPayload(val reportInput: com.alshifa.rapidocusg.KubReportInput) : DocumentPayload()
+    data class UsgPelvisPayload(val reportInput: com.alshifa.rapidocusg.PelvisReportInput) : DocumentPayload()
+    data class UsgObstetricPayload(val reportInput: com.alshifa.rapidocusg.ObstetricReportInput) : DocumentPayload()
     
     data class LeaveCertificatePayload(
         val patient: PatientDemographics,

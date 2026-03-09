@@ -1,167 +1,183 @@
 package com.alshifa.rapidocusg
 
 import android.content.Context
+import android.graphics.Bitmap
 import android.graphics.BitmapFactory
-import android.graphics.Canvas
-import android.graphics.Color
-import android.graphics.Paint
-import android.graphics.pdf.PdfDocument
-import com.alshifa.rapidocusg.R
+import android.util.Log
+import com.alshifa.rapidocusg.core.documentengine.BrandingConfig
+import com.itextpdf.io.image.ImageDataFactory
+import com.itextpdf.kernel.colors.ColorConstants
+import com.itextpdf.kernel.colors.DeviceRgb
+import com.itextpdf.kernel.pdf.PdfDocument
+import com.itextpdf.kernel.pdf.PdfReader
+import com.itextpdf.kernel.pdf.PdfWriter
+import com.itextpdf.layout.Document
+import com.itextpdf.layout.borders.Border
+import com.itextpdf.layout.borders.SolidBorder
+import com.itextpdf.layout.element.Cell
+import com.itextpdf.layout.element.Image
+import com.itextpdf.layout.element.Paragraph
+import com.itextpdf.layout.element.Table
+import com.itextpdf.layout.properties.TextAlignment
+import com.itextpdf.layout.properties.UnitValue
+import com.itextpdf.layout.properties.VerticalAlignment
+import java.io.ByteArrayOutputStream
 import java.io.File
+import java.io.FileInputStream
 import java.io.FileOutputStream
+import java.io.InputStream
 import java.time.format.DateTimeFormatter
 import java.util.Locale
-import com.alshifa.rapidocusg.core.documentengine.BrandingConfig
-import android.graphics.RectF
 
 object PdfGenerator {
 
     private val displayDateTime = DateTimeFormatter.ofPattern("dd MMM yyyy, hh:mm a", Locale.US)
     private val fileDateTime = DateTimeFormatter.ofPattern("yyyyMMdd_HHmm", Locale.US)
 
-    fun generatePdf(context: Context, input: ReportInput, body: ReportBody, branding: BrandingConfig): File {
-        val doc = PdfDocument()
-        val pageInfo = PdfDocument.PageInfo.Builder(595, 842, 1).create() // A4 at 72dpi
-        val page = doc.startPage(pageInfo)
-        val canvas = page.canvas
+    // Impression Colors
+    private val colorNormal = DeviceRgb(46, 125, 50)  // Green
+    private val colorAbnormal = DeviceRgb(211, 47, 47) // Red
+    private val colorGray = DeviceRgb(200, 200, 200)
 
-        val black = Paint().apply { color = Color.BLACK; textSize = 11f; isAntiAlias = true }
-        val bold = Paint(black).apply { textSize = 13f; isFakeBoldText = true }
-        val section = Paint(black).apply { textSize = 12f; isFakeBoldText = true }
-        val tableLabel = Paint(black).apply { isFakeBoldText = true }
-        val linePaint = Paint().apply { color = Color.LTGRAY; strokeWidth = 1f }
-
-        var y = 40f
-
-        drawHeader(context, canvas, bold, branding)
-        y = 90f
-
-        val demoRows = buildList {
-            add("Patient Name" to input.patient.name)
-            val pid = input.patient.patientId.trim()
-            if (pid.isNotEmpty()) add("Patient ID" to pid)
-            add("Age/Gender" to "${input.patient.ageYears} / ${input.patient.sex.name}")
-            add("Booking Date/Time" to input.patient.bookingDateTime.format(displayDateTime))
-            add("Reporting Date/Time" to input.patient.reportingDateTime.format(displayDateTime))
-        }
-
-        y = drawDemographicsTable(canvas, y, demoRows, tableLabel, black, linePaint)
-        y += 20f
-
-        canvas.drawText("Findings", 40f, y, section)
-        y += 18f
-        y = drawParagraphLines(canvas, body.findingsLines, y, black)
-
-        y += 12f
-        canvas.drawText("Impression", 40f, y, section)
-        y += 18f
-
-        val impressionPaint = Paint(black).apply {
-            color = if (body.isNormal) context.getColor(R.color.normal_green) else context.getColor(R.color.abnormal_red)
-            isFakeBoldText = true
-        }
-        drawParagraphLines(canvas, body.impressionLines, y, impressionPaint)
-
-        drawFooter(canvas, black)
-
-        doc.finishPage(page)
-
+    fun generatePdf(context: Context, title: String, patient: PatientInfo, body: ReportBody, branding: BrandingConfig): File {
         val outputDir = File(context.filesDir, "reports")
         outputDir.mkdirs()
-        val safeName = input.patient.name.trim().ifBlank { "Patient" }.replace("[^A-Za-z0-9]+".toRegex(), "_")
-        val fileName = "USG_${safeName}_${input.patient.reportingDateTime.format(fileDateTime)}.pdf"
+        val safeName = patient.name.trim().ifBlank { "Patient" }.replace("[^A-Za-z0-9]+".toRegex(), "_")
+        val fileName = "${title.replace(' ','_')}_${safeName}_${patient.reportingDateTime.format(fileDateTime)}.pdf"
         val outFile = File(outputDir, fileName)
 
-        FileOutputStream(outFile).use { out -> doc.writeTo(out) }
-        doc.close()
+        // Generate the PDF
+        FileOutputStream(outFile).use { fos ->
+            val writer = PdfWriter(fos)
+            val pdfDoc = PdfDocument(writer)
+            val document = Document(pdfDoc)
+
+            // Margins
+            document.setMargins(40f, 40f, 40f, 40f)
+
+            // Header (Logo + Title)
+            val headerTable = Table(UnitValue.createPercentArray(floatArrayOf(1f, 3f)))
+            headerTable.setWidth(UnitValue.createPercentValue(100f))
+
+            val logoBmp = branding.logoPathOrUri?.let { runCatching { BitmapFactory.decodeFile(it) }.getOrNull() }
+                ?: BitmapFactory.decodeResource(context.resources, R.drawable.polyclinic_logo)
+            
+            val logoCell = Cell().setBorder(Border.NO_BORDER)
+            if (logoBmp != null) {
+                val stream = ByteArrayOutputStream()
+                logoBmp.compress(Bitmap.CompressFormat.PNG, 100, stream)
+                val imgData = ImageDataFactory.create(stream.toByteArray())
+                val image = Image(imgData).scaleToFit(80f, 50f)
+                logoCell.add(image)
+            }
+            headerTable.addCell(logoCell)
+
+            val titleCell = Cell().setBorder(Border.NO_BORDER).setVerticalAlignment(VerticalAlignment.MIDDLE)
+            titleCell.add(Paragraph(branding.headerText).setBold().setFontSize(14f))
+            titleCell.add(Paragraph(title).setBold().setFontSize(12f))
+            headerTable.addCell(titleCell)
+
+            document.add(headerTable)
+            document.add(Paragraph("\n").setFontSize(10f))
+
+            // Demographics Table
+            val demoTable = Table(UnitValue.createPercentArray(floatArrayOf(1.5f, 3.5f)))
+            demoTable.setWidth(UnitValue.createPercentValue(100f))
+
+            val border = SolidBorder(colorGray, 1f)
+            
+            fun addRow(label: String, value: String) {
+                val c1 = Cell().add(Paragraph(label).setBold().setFontSize(11f)).setBorder(border).setPadding(4f)
+                val c2 = Cell().add(Paragraph(value).setFontSize(11f)).setBorder(border).setPadding(4f)
+                demoTable.addCell(c1)
+                demoTable.addCell(c2)
+            }
+
+            addRow("Patient Name", patient.name)
+            val pid = patient.patientId.trim()
+            if (pid.isNotEmpty()) addRow("Patient ID", pid)
+            addRow("Age/Gender", "${patient.ageYears} / ${patient.sex.name}")
+            addRow("Booking Date/Time", patient.bookingDateTime.format(displayDateTime))
+            addRow("Reporting Date/Time", patient.reportingDateTime.format(displayDateTime))
+
+            document.add(demoTable)
+            document.add(Paragraph("\n").setFontSize(10f))
+
+            // Findings
+            document.add(Paragraph("Findings").setBold().setFontSize(12f))
+            for (line in body.findingsLines) {
+                val p = Paragraph("•  $line").setFontSize(11f).setMarginBottom(4f)
+                document.add(p)
+            }
+
+            document.add(Paragraph("\n").setFontSize(10f))
+
+            // Impression
+            document.add(Paragraph("Impression").setBold().setFontSize(12f))
+            val impColor = if (body.isNormal) colorNormal else colorAbnormal
+            for (line in body.impressionLines) {
+                val p = Paragraph("•  $line").setFontSize(11f).setBold().setFontColor(impColor).setMarginBottom(4f)
+                document.add(p)
+            }
+
+            // Footer
+            val footer = Paragraph("Electronically verified. Laboratory results should be interpreted by a physician in correlation with clinical and radiologic findings.")
+                .setFontSize(9f)
+                .setTextAlignment(TextAlignment.LEFT)
+                .setFixedPosition(40f, 40f, 515f)
+            
+            document.add(footer)
+
+            document.close()
+        }
+
+        // Validate
+        if (!validatePdf(outFile)) {
+            throw IllegalStateException("Generated PDF failed validation.")
+        }
+
         return outFile
     }
 
-    private fun drawHeader(context: Context, canvas: Canvas, titlePaint: Paint, branding: BrandingConfig) {
-        val logoBmp = branding.logoPathOrUri?.let { runCatching { BitmapFactory.decodeFile(it) }.getOrNull() }
-            ?: BitmapFactory.decodeResource(context.resources, R.drawable.polyclinic_logo)
-        
-        logoBmp?.let {
-            val dstLeft = 40f
-            val dstTop = 20f
-            val dstRight = 120f
-            val dstBottom = 70f
-            canvas.drawBitmap(it, null, RectF(dstLeft, dstTop, dstRight, dstBottom), null)
+    private fun validatePdf(file: File): Boolean {
+        if (!file.exists() || file.length() == 0L) {
+            Log.e("PdfGenerator", "Validation failed: File does not exist or size is 0.")
+            return false
         }
         
-        canvas.drawText(branding.headerText, 135f, 45f, titlePaint)
-        canvas.drawText("Ultrasound Abdomen Report", 135f, 65f, titlePaint)
-    }
-
-    private fun drawDemographicsTable(
-        canvas: Canvas,
-        startY: Float,
-        rows: List<Pair<String, String>>,
-        labelPaint: Paint,
-        valuePaint: Paint,
-        linePaint: Paint
-    ): Float {
-        var y = startY
-        val left = 40f
-        val middle = 180f
-        val right = 555f
-        val rowHeight = 24f
-
-        rows.forEach { (label, value) ->
-            canvas.drawText(label, left + 4f, y + 16f, labelPaint)
-            canvas.drawText(value, middle + 4f, y + 16f, valuePaint)
-            canvas.drawLine(left, y + rowHeight, right, y + rowHeight, linePaint)
-            y += rowHeight
-        }
-
-        canvas.drawLine(left, startY, left, y, linePaint)
-        canvas.drawLine(middle, startY, middle, y, linePaint)
-        canvas.drawLine(right, startY, right, y, linePaint)
-        canvas.drawLine(left, startY, right, startY, linePaint)
-
-        return y
-    }
-
-    private fun drawParagraphLines(canvas: Canvas, lines: List<String>, startY: Float, paint: Paint): Float {
-        var y = startY
-        val left = 50f
-        val maxWidth = 500f
-        lines.forEach { sentence ->
-            val wrapped = wrapText(sentence, paint, maxWidth)
-            wrapped.forEach { line ->
-                canvas.drawText("• $line", left, y, paint)
-                y += 16f
+        // Check for EOF marker (%%EOF) loosely
+        try {
+            val raf = java.io.RandomAccessFile(file, "r")
+            val length = raf.length()
+            if (length < 6) return false
+            raf.seek(length - 100)
+            val buffer = ByteArray(100)
+            raf.read(buffer)
+            raf.close()
+            val tail = String(buffer)
+            if (!tail.contains("%%EOF")) {
+                Log.e("PdfGenerator", "Validation failed: %%EOF marker not found.")
+                return false
             }
-            y += 4f
+        } catch (e: Exception) {
+            Log.e("PdfGenerator", "Validation failed: Could not read file tail.", e)
+            return false
         }
-        return y
-    }
-
-    private fun wrapText(text: String, paint: Paint, maxWidth: Float): List<String> {
-        val words = text.split(" ")
-        val lines = mutableListOf<String>()
-        var current = ""
-        for (word in words) {
-            val next = if (current.isBlank()) word else "$current $word"
-            if (paint.measureText(next) <= maxWidth) {
-                current = next
-            } else {
-                if (current.isNotBlank()) lines += current
-                current = word
+        
+        // Parse with iText PdfReader
+        try {
+            val reader = PdfReader(file.absolutePath)
+            val doc = PdfDocument(reader)
+            if (doc.numberOfPages <= 0) {
+                Log.e("PdfGenerator", "Validation failed: No pages in PDF.")
+                return false
             }
+            doc.close()
+        } catch (e: Exception) {
+            Log.e("PdfGenerator", "Validation failed: Cannot be parsed by PdfReader.", e)
+            return false
         }
-        if (current.isNotBlank()) lines += current
-        return lines
-    }
 
-    private fun drawFooter(canvas: Canvas, paint: Paint) {
-        paint.textSize = 9f
-        val footer = "Electronically verified. Laboratory results should be interpreted by a physician in correlation with clinical and radiologic findings."
-        val wrapped = wrapText(footer, paint, 510f)
-        var y = 790f
-        wrapped.forEach { line ->
-            canvas.drawText(line, 40f, y, paint)
-            y += 12f
-        }
+        return true
     }
 }

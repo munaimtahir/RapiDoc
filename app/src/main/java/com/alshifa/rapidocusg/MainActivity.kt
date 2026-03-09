@@ -70,6 +70,18 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.filled.List
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Create
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.rotate
+import com.alshifa.rapidocusg.core.documentengine.DocumentMeta
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -85,6 +97,9 @@ import com.alshifa.rapidocusg.core.documentengine.LeaveCertificateRenderer
 import com.alshifa.rapidocusg.core.documentengine.FitnessCertificateRenderer
 import com.alshifa.rapidocusg.ui.screens.LeaveCertificateFormScreen
 import com.alshifa.rapidocusg.ui.screens.FitnessCertificateFormScreen
+import com.alshifa.rapidocusg.ui.screens.KubFormScreen
+import com.alshifa.rapidocusg.ui.screens.PelvisFormScreen
+import com.alshifa.rapidocusg.ui.screens.ObstetricFormScreen
 import com.alshifa.rapidocusg.ui.screens.ParserDictionaryScreen
 import com.alshifa.rapidocusg.core.parser.ChatParser
 import com.alshifa.rapidocusg.core.parser.ParseResult
@@ -95,6 +110,9 @@ import com.alshifa.rapidocusg.core.documentengine.SettingsStore
 import com.alshifa.rapidocusg.core.documentengine.SystemTimeProvider
 import com.alshifa.rapidocusg.core.documentengine.TimingConfig
 import com.alshifa.rapidocusg.core.documentengine.UsgRenderer
+import com.alshifa.rapidocusg.core.documentengine.KubRenderer
+import com.alshifa.rapidocusg.core.documentengine.PelvisRenderer
+import com.alshifa.rapidocusg.core.documentengine.ObstetricRenderer
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -159,27 +177,40 @@ private fun RapiDocApp(settingsStore: SettingsStore, settings: AppSettings) {
     NavHost(navController = navController, startDestination = "home") {
         composable("home") {
             Scaffold { padding ->
-                Column(Modifier.padding(padding).fillMaxSize().padding(16.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("RapiDoc", style = MaterialTheme.typography.headlineSmall)
-                    
-                    Text("Quick Entry", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                    Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                        OutlinedTextField(
-                            value = rawQuickEntry,
-                            onValueChange = { rawQuickEntry = it },
-                            modifier = Modifier.weight(1f),
-                            label = { Text("Command") }
-                        )
+                Column(Modifier.padding(padding).fillMaxSize().padding(16.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)) {
+                        Icon(Icons.Filled.Create, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(32.dp))
                         Spacer(Modifier.width(8.dp))
-                        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                            if (rawQuickEntry.isNotEmpty()) {
-                                TextButton(onClick = { 
-                                    rawQuickEntry = ""
-                                    parseResult = null
-                                    initialFields = emptyMap()
-                                }) { Text("Clear") }
-                            }
-                            Button(onClick = {
+                        Text("RapiDoc", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.ExtraBold, color = MaterialTheme.colorScheme.primary)
+                    }
+                    
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+                        shape = RoundedCornerShape(16.dp)
+                    ) {
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            Text("Smart Quick Entry", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                            Spacer(Modifier.height(8.dp))
+                            Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                                OutlinedTextField(
+                                    value = rawQuickEntry,
+                                    onValueChange = { rawQuickEntry = it },
+                                    modifier = Modifier.weight(1f),
+                                    label = { Text("Command") },
+                                    shape = RoundedCornerShape(12.dp)
+                                )
+                                Spacer(Modifier.width(8.dp))
+                                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                    if (rawQuickEntry.isNotEmpty()) {
+                                        TextButton(onClick = { 
+                                            rawQuickEntry = ""
+                                            parseResult = null
+                                            initialFields = emptyMap()
+                                        }) { Text("Clear") }
+                                    }
+                                    Button(shape = RoundedCornerShape(12.dp), onClick = {
                                 val mapType = object : com.google.gson.reflect.TypeToken<Map<String, String>>() {}.type
                                 val mappings: Map<String, String> = if (settings.parserSynonymsJson.isBlank() || settings.parserSynonymsJson == "{}") {
                                     emptyMap()
@@ -211,8 +242,10 @@ private fun RapiDocApp(settingsStore: SettingsStore, settings: AppSettings) {
                                         navController.navigate(route)
                                     }
                                 }
-                            }) { Text("Parse") }
-                    }
+                                    }) { Text("Parse") }
+                                }
+                            }
+                        }
                     }
 
                     if (parseResult != null) {
@@ -261,16 +294,26 @@ private fun RapiDocApp(settingsStore: SettingsStore, settings: AppSettings) {
                         )
                     }
 
-                    HorizontalDivider()
-                    DocumentRegistry.docs.forEach { meta ->
-                        Button(onClick = {
-                            navController.navigate(meta.formRoute)
-                        }, enabled = true, modifier = Modifier.fillMaxWidth()) {
-                            Text(meta.displayName)
+                    HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+                    Text("Services", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                    
+                    val usgDocs = DocumentRegistry.docs.filter { it.type.name.startsWith("USG") }
+                    val certDocs = DocumentRegistry.docs.filter { it.type.name.contains("CERT") }
+                    
+                    CategoryCard("Ultrasound Scans", Icons.Filled.Favorite, usgDocs, navController)
+                    CategoryCard("Certificates", Icons.Filled.List, certDocs, navController)
+
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
+                        TextButton(onClick = { navController.navigate("settings") }) {
+                            Icon(Icons.Filled.Settings, contentDescription = null, modifier = Modifier.padding(end = 4.dp))
+                            Text("Settings")
+                        }
+                        TextButton(onClick = { navController.navigate("dictionary") }) {
+                            Icon(Icons.Filled.Info, contentDescription = null, modifier = Modifier.padding(end = 4.dp))
+                            Text("Parser Dictionary")
                         }
                     }
-                    TextButton(onClick = { navController.navigate("settings") }) { Text("Settings") }
-                    TextButton(onClick = { navController.navigate("dictionary") }) { Text("Parser Dictionary") }
                 }
             }
         }
@@ -364,6 +407,30 @@ private fun RapiDocApp(settingsStore: SettingsStore, settings: AppSettings) {
                 onGenerated = { rendered, type -> currentDocument = rendered; currentDocType = type; navController.navigate("doc/medical_fitness_cert/preview") }
             )
         }
+        composable("doc/usg_kub/form") {
+            KubFormScreen(
+                settings = settings,
+                initialFields = initialFields,
+                onBack = { navController.popBackStack() },
+                onGenerated = { rendered, type -> currentDocument = rendered; currentDocType = type; navController.navigate("doc/usg_kub/preview") }
+            )
+        }
+        composable("doc/usg_pelvis/form") {
+            PelvisFormScreen(
+                settings = settings,
+                initialFields = initialFields,
+                onBack = { navController.popBackStack() },
+                onGenerated = { rendered, type -> currentDocument = rendered; currentDocType = type; navController.navigate("doc/usg_pelvis/preview") }
+            )
+        }
+        composable("doc/usg_obstetric/form") {
+            ObstetricFormScreen(
+                settings = settings,
+                initialFields = initialFields,
+                onBack = { navController.popBackStack() },
+                onGenerated = { rendered, type -> currentDocument = rendered; currentDocType = type; navController.navigate("doc/usg_obstetric/preview") }
+            )
+        }
         composable("doc/{docType}/preview", arguments = listOf(navArgument("docType") { type = NavType.StringType })) { backStack ->
             val docTypeArg = backStack.arguments?.getString("docType").orEmpty()
             if (docTypeArg.isBlank()) {
@@ -411,9 +478,64 @@ private fun RapiDocApp(settingsStore: SettingsStore, settings: AppSettings) {
 
 private fun docTypeFromRouteArg(docTypeArg: String): DocumentType? = when (docTypeArg) {
     "usg_abdomen" -> DocumentType.USG_ABDOMEN
+    "usg_kub" -> DocumentType.USG_KUB
+    "usg_pelvis" -> DocumentType.USG_PELVIS
+    "usg_obstetric" -> DocumentType.USG_OBSTETRIC
     "medical_leave_cert" -> DocumentType.MEDICAL_LEAVE_CERT
     "medical_fitness_cert" -> DocumentType.MEDICAL_FITNESS_CERT
     else -> null
+}
+
+@Composable
+private fun CategoryCard(
+    title: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    items: List<DocumentMeta>,
+    navController: androidx.navigation.NavController
+) {
+    var expanded by remember { mutableStateOf(false) }
+    val rotation by animateFloatAsState(targetValue = if (expanded) 180f else 0f, label = "rotation")
+
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .clickable { expanded = !expanded },
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(28.dp))
+                Spacer(Modifier.width(12.dp))
+                Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
+                Icon(
+                    Icons.Filled.KeyboardArrowDown,
+                    contentDescription = "Expand",
+                    modifier = Modifier.rotate(rotation)
+                )
+            }
+            AnimatedVisibility(visible = expanded) {
+                Column(modifier = Modifier.padding(top = 16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    items.forEach { meta ->
+                        Button(
+                            onClick = { navController.navigate(meta.formRoute) },
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = MaterialTheme.colorScheme.primaryContainer,
+                                contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                            ),
+                            shape = RoundedCornerShape(8.dp)
+                        ) {
+                            Text(meta.displayName, fontWeight = FontWeight.Medium)
+                        }
+                    }
+                }
+            }
+        }
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -806,7 +928,7 @@ private fun QuickEntryScreen(
 }
 
 @Composable
-private fun OrganSection(
+fun OrganSection(
     title: String,
     mode: OrganPrintMode,
     forceNormal: Boolean,
@@ -976,7 +1098,7 @@ private fun renderPdfFirstPageImpl(file: File): Bitmap? {
 }
 
 @Composable
-private fun <T> EnumSelector(
+fun <T> EnumSelector(
     label: String,
     options: List<T>,
     selected: T,
