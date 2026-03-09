@@ -1,0 +1,15 @@
+{
+  "name": "rapidoc-e2e",
+  "version": "1.0.0",
+  "description": "Playwright e2e test suite for RapiDoc Android app",
+  "private": true,
+  "scripts": {
+    "test": "playwright test",
+    "test:report": "playwright show-report playwright-report"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.58.2",
+    "@types/node": "25.3.5",
+    "typescript": "5.9.3"
+  }
+}

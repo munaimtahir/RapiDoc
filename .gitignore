@@ -33,3 +33,9 @@ google-services.json
 
 # Android Profiling
 *.hprof
+
+# Playwright e2e — generated artefacts and dependencies
+e2e/node_modules/
+e2e/dist/
+e2e/playwright-report/
+e2e/test-results/
